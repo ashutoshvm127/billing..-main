@@ -3,8 +3,8 @@
 import { ProtectedLayout } from "@/components/protected-layout"
 import { PageNavigation } from "@/components/page-navigation"
 import { useState, useEffect } from "react"
-import { Plus, Edit2, Trash2, Eye, Download } from "lucide-react"
-import { EnhancedInvoiceForm } from "@/components/invoices/enhanced-invoice-form"
+import { Plus, Edit2, Trash2, Eye } from "lucide-react"
+import EnhancedInvoiceForm from "@/components/invoices/enhanced-invoice-form"
 import InvoicePreview from "@/components/invoices/invoice-preview-enhanced"
 
 interface Quote {

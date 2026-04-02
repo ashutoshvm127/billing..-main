@@ -2,7 +2,7 @@
 
 import { ProtectedLayout } from "@/components/protected-layout"
 import { PageNavigation } from "@/components/page-navigation"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Plus, Trash2, Eye, Download, Mail } from "lucide-react"
 import EnhancedInvoiceForm from "@/components/invoices/enhanced-invoice-form"
 import InvoicePreview from "@/components/invoices/invoice-preview-enhanced"
@@ -10,10 +10,12 @@ import { Invoice } from "@/types/invoice"
 import { Button } from "@/components/ui/button"
 
 export default function InvoicesPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>(() => {
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+
+  useEffect(() => {
     const stored = localStorage.getItem('billingInvoices')
-    return stored ? JSON.parse(stored) : []
-  })
+    setInvoices(stored ? JSON.parse(stored) : [])
+  }, [])
   
   const [showForm, setShowForm] = useState(false)
   const [showPreview, setShowPreview] = useState(false)

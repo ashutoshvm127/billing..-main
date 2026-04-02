@@ -2,7 +2,7 @@
 
 import { ProtectedLayout } from "@/components/protected-layout"
 import { PageNavigation } from "@/components/page-navigation"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Plus, Trash2, Mail, Phone } from "lucide-react"
 
 interface Client {
@@ -16,10 +16,12 @@ interface Client {
 }
 
 export default function ClientsPage() {
-  const [clients, setClients] = useState<Client[]>(() => {
+  const [clients, setClients] = useState<Client[]>([])
+
+  useEffect(() => {
     const stored = localStorage.getItem('billingClients')
-    return stored ? JSON.parse(stored) : []
-  })
+    setClients(stored ? JSON.parse(stored) : [])
+  }, [])
 
   const [showForm, setShowForm] = useState(false)
   const [formData, setFormData] = useState({

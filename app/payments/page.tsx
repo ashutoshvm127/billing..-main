@@ -16,10 +16,12 @@ interface Payment {
 }
 
 export default function PaymentsPage() {
-  const [payments, setPayments] = useState<Payment[]>(() => {
+  const [payments, setPayments] = useState<Payment[]>([])
+
+  useEffect(() => {
     const stored = localStorage.getItem('billingPayments')
-    return stored ? JSON.parse(stored) : []
-  })
+    setPayments(stored ? JSON.parse(stored) : [])
+  }, [])
 
   const [showForm, setShowForm] = useState(false)
   const [formData, setFormData] = useState({

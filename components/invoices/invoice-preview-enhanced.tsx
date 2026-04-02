@@ -4,7 +4,6 @@ import { useRef, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Download, Send, Printer } from 'lucide-react'
 import { Invoice } from '@/types/invoice'
-import html2pdf from 'html2pdf.js'
 
 const getCurrencySymbol = (currency?: string): string => {
   const symbols: { [key: string]: string } = {
@@ -32,7 +31,7 @@ export default function InvoicePreview({ invoice }: { invoice: Invoice }) {
     }
   }, [invoice])
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     const element = invoiceRef.current
     if (!element) return
 
@@ -44,6 +43,7 @@ export default function InvoicePreview({ invoice }: { invoice: Invoice }) {
       jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
     }
 
+    const { default: html2pdf } = await import('html2pdf.js')
     html2pdf().set(options).from(element).save()
   }
 
