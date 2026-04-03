@@ -22,6 +22,7 @@ const getCurrencySymbol = (currency?: string): string => {
 export default function InvoicePreview({ invoice }: { invoice: Invoice }) {
   const invoiceRef = useRef<HTMLDivElement>(null)
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null)
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false)
 
   useEffect(() => {
     if (invoice.upiId) {
@@ -43,8 +44,17 @@ export default function InvoicePreview({ invoice }: { invoice: Invoice }) {
       jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
     }
 
-    const { default: html2pdf } = await import('html2pdf.js')
-    html2pdf().set(options).from(element).save()
+    try {
+      setIsGeneratingPdf(true)
+
+      // Allow React to paint the centered PDF watermark before capture starts.
+      await new Promise(resolve => requestAnimationFrame(() => resolve(null)))
+
+      const { default: html2pdf } = await import('html2pdf.js')
+      await html2pdf().set(options).from(element).save()
+    } finally {
+      setIsGeneratingPdf(false)
+    }
   }
 
   const handlePrint = () => {
@@ -119,15 +129,14 @@ export default function InvoicePreview({ invoice }: { invoice: Invoice }) {
         style={{ fontFamily: 'Arial, sans-serif', maxWidth: '800px', fontSize: '12px' }}
       >
         {/* Watermarks */}
-        {watermarkPositions.map((mark, index) => (
+        {isGeneratingPdf ? (
           <div
-            key={`watermark-${index}`}
             style={{
               position: 'absolute',
-              top: `${mark.top}%`,
-              left: `${mark.left}%`,
-              transform: `translate(-50%, -50%) rotate(${mark.rotate}deg)`,
-              opacity: mark.opacity,
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              opacity: 0.06,
               pointerEvents: 'none',
               zIndex: 0,
             }}
@@ -135,10 +144,31 @@ export default function InvoicePreview({ invoice }: { invoice: Invoice }) {
             <img
               src="/logo.png"
               alt=""
-              style={{ width: `${mark.size}px`, height: `${mark.size}px`, objectFit: 'contain' }}
+              style={{ width: '360px', height: '360px', objectFit: 'contain' }}
             />
           </div>
-        ))}
+        ) : (
+          watermarkPositions.map((mark, index) => (
+            <div
+              key={`watermark-${index}`}
+              style={{
+                position: 'absolute',
+                top: `${mark.top}%`,
+                left: `${mark.left}%`,
+                transform: `translate(-50%, -50%) rotate(${mark.rotate}deg)`,
+                opacity: mark.opacity,
+                pointerEvents: 'none',
+                zIndex: 0,
+              }}
+            >
+              <img
+                src="/logo.png"
+                alt=""
+                style={{ width: `${mark.size}px`, height: `${mark.size}px`, objectFit: 'contain' }}
+              />
+            </div>
+          ))
+        )}
 
         {/* Main Content */}
         <div style={{ position: 'relative', zIndex: 1, padding: '40px' }}>
