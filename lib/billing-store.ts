@@ -19,11 +19,45 @@ interface DataRow<T> {
 
 const MIGRATION_VERSION = 'v1'
 
+function isDueDatePast(dueDate: string): boolean | null {
+  if (!dueDate) return null
+
+  const due = new Date(dueDate)
+  if (Number.isNaN(due.getTime())) return null
+
+  const dueDay = new Date(due)
+  dueDay.setHours(0, 0, 0, 0)
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  return dueDay.getTime() < today.getTime()
+}
+
 function normalizeInvoiceStatus(invoice: Invoice): Invoice {
-  if ((invoice as any).status === 'draft') {
+  const rawStatus = (invoice as any).status as string | undefined
+  let nextStatus: Invoice['status'] = invoice.status
+
+  if (rawStatus === 'draft') {
+    nextStatus = 'sent'
+  } else if (rawStatus === 'sent' || rawStatus === 'paid' || rawStatus === 'overdue') {
+    nextStatus = rawStatus
+  }
+
+  if (nextStatus !== 'paid') {
+    const pastDue = isDueDatePast(invoice.dueDate)
+    if (pastDue === true && nextStatus === 'sent') {
+      nextStatus = 'overdue'
+    }
+    if (pastDue === false && nextStatus === 'overdue') {
+      nextStatus = 'sent'
+    }
+  }
+
+  if (nextStatus !== invoice.status) {
     return {
       ...invoice,
-      status: 'overdue',
+      status: nextStatus,
     }
   }
 

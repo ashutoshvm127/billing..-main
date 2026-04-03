@@ -39,7 +39,7 @@ export default function InvoiceForm({ onSubmit }: InvoiceFormProps) {
     { description: '', quantity: 1, rate: 0 }
   ])
   const [notes, setNotes] = useState('')
-  const [status, setStatus] = useState<'sent' | 'paid' | 'overdue'>('overdue')
+  const [status, setStatus] = useState<'sent' | 'paid' | 'overdue'>('sent')
   const [currency, setCurrency] = useState('INR')
 
   const handleAddItem = () => {
@@ -96,7 +96,7 @@ export default function InvoiceForm({ onSubmit }: InvoiceFormProps) {
     setDueDate('')
     setItems([{ description: '', quantity: 1, rate: 0 }])
     setNotes('')
-    setStatus('overdue')
+    setStatus('sent')
     setCurrency('INR')
   }
 
@@ -168,8 +168,8 @@ export default function InvoiceForm({ onSubmit }: InvoiceFormProps) {
             onChange={(e) => setStatus(e.target.value as 'sent' | 'paid' | 'overdue')}
             className="w-full px-4 py-2 border border-gray-300 dark:border-[#2B2B30] rounded-lg dark:bg-[#0F0F12] dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
           >
-            <option value="overdue">Final Bill (Unpaid/Overdue)</option>
             <option value="sent">Sent</option>
+            <option value="overdue">Overdue</option>
             <option value="paid">Paid</option>
           </select>
         </div>

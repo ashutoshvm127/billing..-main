@@ -183,12 +183,17 @@ export default function InvoicesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-[#2B2B30]">
-                  {filteredInvoices.map((invoice) => (
-                    <tr key={invoice.id} className="hover:bg-gray-50 dark:hover:bg-[#0F0F12] transition">
+                  {filteredInvoices.map((invoice) => {
+                    const dueTiming = getDueTiming(invoice)
+
+                    return <tr key={invoice.id} className="hover:bg-gray-50 dark:hover:bg-[#0F0F12] transition">
                       <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">{invoice.invoiceNumber}</td>
                       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{invoice.clientName}</td>
                       <td className="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-white">{getCurrencySymbol(invoice.currency)}{invoice.amount.toFixed(2)}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{new Date(invoice.dueDate).toLocaleDateString()}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                        <div>{new Date(invoice.dueDate).toLocaleDateString()}</div>
+                        <div className={`text-xs mt-1 ${dueTiming.className}`}>{dueTiming.label}</div>
+                      </td>
                       <td className="px-6 py-4 text-sm">
                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusStyles(invoice.status)}`}>
                           {invoice.status}
@@ -218,7 +223,7 @@ export default function InvoicesPage() {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                  })}
                 </tbody>
               </table>
             </div>
@@ -249,6 +254,42 @@ export default function InvoicesPage() {
 
     </ProtectedLayout>
   )
+}
+
+function getDueTiming(invoice: Invoice): { label: string; className: string } {
+  if (invoice.status === 'paid') {
+    return { label: 'Paid', className: 'text-green-600 dark:text-green-400' }
+  }
+
+  const dueDate = new Date(invoice.dueDate)
+  if (Number.isNaN(dueDate.getTime())) {
+    return { label: 'Invalid due date', className: 'text-gray-500 dark:text-gray-400' }
+  }
+
+  const due = new Date(dueDate)
+  due.setHours(0, 0, 0, 0)
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const diffDays = Math.floor((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+
+  if (diffDays < 0) {
+    const days = Math.abs(diffDays)
+    return {
+      label: `Overdue by ${days} day${days === 1 ? '' : 's'}`,
+      className: 'text-red-600 dark:text-red-400',
+    }
+  }
+
+  if (diffDays === 0) {
+    return { label: 'Due today', className: 'text-amber-600 dark:text-amber-400' }
+  }
+
+  return {
+    label: `Due in ${diffDays} day${diffDays === 1 ? '' : 's'}`,
+    className: 'text-blue-600 dark:text-blue-400',
+  }
 }
 
 function getCurrencySymbol(currency?: string): string {

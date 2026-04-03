@@ -83,7 +83,7 @@ export default function QuotesPage() {
       clientAddress: quote.companyAddress || '',
       clientPhone: quote.companyPhone || '',
       amount: quote.totalAmount || quote.amount,
-      status: 'overdue',
+      status: 'sent',
       dueDate: quote.expiryDate || new Date().toISOString().split('T')[0],
       createdAt: new Date().toISOString(),
       items: (quote.items || []) as any,

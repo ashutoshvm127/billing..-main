@@ -20,3 +20,21 @@ export function getCurrencySymbol(currency: CurrencyCode): string {
 export function formatCurrency(amount: number, currency: CurrencyCode): string {
   return `${getCurrencySymbol(currency)}${amount.toFixed(2)}`
 }
+
+export function convertCurrency(
+  amount: number,
+  fromCurrency: CurrencyCode,
+  toCurrency: CurrencyCode,
+  exchangeRates: Record<CurrencyCode, number>
+): number {
+  if (fromCurrency === toCurrency) return amount
+
+  const fromRate = exchangeRates[fromCurrency]
+  const toRate = exchangeRates[toCurrency]
+
+  if (!fromRate || !toRate) return amount
+
+  // Exchange rates are relative to USD (USD = 1), so normalize via USD.
+  const amountInUsd = amount / fromRate
+  return amountInUsd * toRate
+}
