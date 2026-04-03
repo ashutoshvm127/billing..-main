@@ -9,6 +9,7 @@ import InvoicePreview from "@/components/invoices/invoice-preview-enhanced"
 import { Invoice } from "@/types/invoice"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/context/auth-context"
+import { useBillingRealtime } from "@/hooks/use-billing-realtime"
 import { BILLING_DATA_CHANGE_KEY, deleteInvoice, getInvoices, upsertInvoice } from "@/lib/billing-store"
 
 export default function InvoicesPage() {
@@ -25,6 +26,8 @@ export default function InvoicesPage() {
   useEffect(() => {
     loadInvoices()
   }, [loadInvoices])
+
+  useBillingRealtime(user?.id, ['invoices', 'payments', 'quotes'], loadInvoices)
 
   useEffect(() => {
     const onBillingDataChanged = (event?: Event) => {
@@ -61,7 +64,6 @@ export default function InvoicesPage() {
     } else {
       updated = [...invoices, newInvoice]
     }
-  import { useBillingRealtime } from "@/hooks/use-billing-realtime"
 
     await upsertInvoice(user.id, newInvoice)
     setInvoices(updated)
@@ -98,8 +100,6 @@ export default function InvoicesPage() {
     // Create a simple text-based PDF export
     const content = generateInvoiceText(invoice)
     const element = document.createElement("a")
-
-    useBillingRealtime(user?.id, ['invoices', 'payments', 'quotes'], loadInvoices)
     element.setAttribute("href", "data:text/plain;charset=utf-8," + encodeURIComponent(content))
     element.setAttribute("download", `Invoice-${invoice.invoiceNumber}.txt`)
     element.style.display = "none"
