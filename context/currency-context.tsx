@@ -31,6 +31,22 @@ const DEFAULT_EXCHANGE_RATES: Record<CurrencyCode, number> = {
 }
 
 const SUPPORTED_CURRENCIES: CurrencyCode[] = ['USD', 'INR', 'EUR', 'GBP', 'AUD', 'CAD', 'SGD', 'AED', 'JPY', 'CHF']
+const ENV_GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || ''
+
+function parseProviderRates(rawRates: Record<string, unknown>): Record<CurrencyCode, number> | null {
+  const next: Partial<Record<CurrencyCode, number>> = {}
+
+  for (const currency of SUPPORTED_CURRENCIES) {
+    const value = rawRates[currency]
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+      return null
+    }
+    next[currency] = value
+  }
+
+  next.USD = 1
+  return next as Record<CurrencyCode, number>
+}
 
 export const CURRENCY_SYMBOLS: Record<CurrencyCode, string> = {
   'INR': '₹',
@@ -75,18 +91,21 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
 
     try {
       const parsed = JSON.parse(trimmed.slice(start, end + 1)) as Record<string, unknown>
-      const next: Partial<Record<CurrencyCode, number>> = {}
+      return parseProviderRates(parsed)
+    } catch {
+      return null
+    }
+  }
 
-      for (const currency of SUPPORTED_CURRENCIES) {
-        const value = parsed[currency]
-        if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-          return null
-        }
-        next[currency] = value
-      }
+  const fetchRatesFromMarket = async (): Promise<Record<CurrencyCode, number> | null> => {
+    try {
+      const response = await fetch('https://open.er-api.com/v6/latest/USD')
+      if (!response.ok) return null
 
-      next.USD = 1
-      return next as Record<CurrencyCode, number>
+      const data = await response.json()
+      if (data?.result !== 'success' || !data?.rates) return null
+
+      return parseProviderRates(data.rates as Record<string, unknown>)
     } catch {
       return null
     }
@@ -164,16 +183,24 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     }
     
     // Load saved Gemini API key
-    const apiKey = localStorage.getItem('geminiApiKey')
-    if (apiKey) setGeminiApiKey(apiKey)
+    const savedApiKey = localStorage.getItem('geminiApiKey')
+    if (savedApiKey) {
+      setGeminiApiKey(savedApiKey)
+    } else if (ENV_GEMINI_API_KEY) {
+      setGeminiApiKey(ENV_GEMINI_API_KEY)
+    }
   }, [])
 
   useEffect(() => {
-    const syncRatesFromGemini = async () => {
-      if (!geminiApiKey) return
-
+    const syncRates = async () => {
+      // Use market FX feed as primary source and Gemini as fallback.
       setExchangeRatesSyncing(true)
-      const nextRates = await fetchRatesFromGemini(geminiApiKey)
+
+      let nextRates = await fetchRatesFromMarket()
+      if (!nextRates && geminiApiKey) {
+        nextRates = await fetchRatesFromGemini(geminiApiKey)
+      }
+
       if (!nextRates) {
         setExchangeRatesSyncing(false)
         return
@@ -187,7 +214,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('exchangeRatesUpdatedAt', updatedAt)
     }
 
-    syncRatesFromGemini()
+    syncRates()
   }, [geminiApiKey])
 
   const handleSetCurrency = (currency: CurrencyCode) => {

@@ -7,7 +7,7 @@ import { useCurrency } from "@/context/currency-context"
 import { useSettings } from "@/context/settings-context"
 import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
-import { Lock, Building2, Bell, Trash2, DollarSign, CreditCard, Zap } from "lucide-react"
+import { Lock, Building2, Bell, Trash2, DollarSign, CreditCard } from "lucide-react"
 
 interface PaymentSettings {
   upiId: string
@@ -26,8 +26,6 @@ interface CompanySettings {
 export default function SettingsPage() {
   const { user, logout } = useAuth()
   const {
-    geminiApiKey,
-    setGeminiApiKey,
     selectedCurrency,
     setCurrency,
     exchangeRatesUpdatedAt,
@@ -38,7 +36,6 @@ export default function SettingsPage() {
   const [savedMessage, setSavedMessage] = useState('')
   const [testEmailRecipient, setTestEmailRecipient] = useState('')
   const [testEmailLoading, setTestEmailLoading] = useState(false)
-  const [geminiKey, setGeminiKeyLocal] = useState(geminiApiKey)
   const [showSettingsSavedModal, setShowSettingsSavedModal] = useState(false)
 
   const handleNotificationChange = (key: keyof typeof notificationSettings) => {
@@ -53,18 +50,6 @@ export default function SettingsPage() {
   const handlePaymentSettingsSave = () => {
     setPaymentSettings(paymentSettings)
     setSavedMessage('Payment settings saved')
-    setTimeout(() => setSavedMessage(''), 3000)
-  }
-
-  const handleGeminiKeySave = () => {
-    setGeminiApiKey(geminiKey)
-    setSavedMessage('Gemini API key saved')
-    setTimeout(() => setSavedMessage(''), 3000)
-  }
-
-  const handleCurrencyChange = (currency: any) => {
-    setCurrency(currency)
-    setSavedMessage('Currency preference updated')
     setTimeout(() => setSavedMessage(''), 3000)
   }
 
@@ -322,7 +307,7 @@ export default function SettingsPage() {
                 All invoice totals are locked at creation time and won't change with exchange rate fluctuations.
               </p>
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-                Exchange rates status: {exchangeRatesSyncing ? 'Syncing from Gemini...' : 'Ready'}
+                Exchange rates status: {exchangeRatesSyncing ? 'Syncing...' : 'Ready'}
               </p>
               {exchangeRatesUpdatedAt && (
                 <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
@@ -339,42 +324,6 @@ export default function SettingsPage() {
             >
               Save Currency Settings
             </button>
-          </div>
-        </div>
-
-        {/* Gemini AI Settings */}
-        <div className="bg-white dark:bg-[#1F1F23] rounded-xl shadow-lg p-6 border border-gray-200 dark:border-[#2B2B30]">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-            <Zap className="w-5 h-5 text-blue-600" />
-            Gemini AI Integration
-          </h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Gemini API Key
-              </label>
-              <input
-                type="password"
-                placeholder="Enter your Gemini API key"
-                value={geminiKey}
-                onChange={(e) => setGeminiKeyLocal(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-[#2B2B30] rounded-lg dark:bg-[#0F0F12] dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-                Get your Gemini API key from <a href="https://ai.google.dev" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700">Google AI Studio</a>
-              </p>
-            </div>
-            <button
-              onClick={handleGeminiKeySave}
-              className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-medium"
-            >
-              Save Gemini API Key
-            </button>
-            <div className="bg-blue-50 dark:bg-blue-500/10 p-3 rounded-lg border border-blue-200 dark:border-blue-500/20">
-              <p className="text-sm text-blue-900 dark:text-blue-300">
-                <strong>Note:</strong> Your Gemini API key is used to fetch current exchange rates for invoice conversion and generate insights. It's stored locally in your browser.
-              </p>
-            </div>
           </div>
         </div>
 
