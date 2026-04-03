@@ -29,6 +29,8 @@ export default function SettingsPage() {
   const { paymentSettings, setPaymentSettings, companySettings, setCompanySettings, notificationSettings, setNotificationSettings } = useSettings()
   const router = useRouter()
   const [savedMessage, setSavedMessage] = useState('')
+  const [testEmailRecipient, setTestEmailRecipient] = useState('')
+  const [testEmailLoading, setTestEmailLoading] = useState(false)
   const [geminiKey, setGeminiKeyLocal] = useState(geminiApiKey)
   const [showSettingsSavedModal, setShowSettingsSavedModal] = useState(false)
 
@@ -77,6 +79,39 @@ export default function SettingsPage() {
     setCompanySettings(companySettings)
     setShowSettingsSavedModal(true)
     setTimeout(() => setShowSettingsSavedModal(false), 2000)
+  }
+
+  const handleSendTestEmail = async () => {
+    const recipient = testEmailRecipient.trim() || user?.email || companySettings.companyEmail
+
+    if (!recipient) {
+      setSavedMessage('Add a test recipient email first')
+      setTimeout(() => setSavedMessage(''), 3000)
+      return
+    }
+
+    setTestEmailLoading(true)
+    try {
+      const response = await fetch('/api/send-test-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipient }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || 'Failed to send test email')
+      }
+
+      setSavedMessage(`Test email sent to ${recipient}`)
+      setTimeout(() => setSavedMessage(''), 3000)
+    } catch (error: any) {
+      setSavedMessage(`Test email failed: ${error.message || 'Unknown error'}`)
+      setTimeout(() => setSavedMessage(''), 4000)
+    } finally {
+      setTestEmailLoading(false)
+    }
   }
 
   const handleSignatureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -347,6 +382,20 @@ export default function SettingsPage() {
                 className="w-full px-4 py-2 border border-gray-300 dark:border-[#2B2B30] rounded-lg dark:bg-[#0F0F12] dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">This email will be used as the sender for all invoices and mail</p>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Test Recipient Email
+              </label>
+              <input
+                type="email"
+                placeholder={user?.email || 'you@example.com'}
+                value={testEmailRecipient}
+                onChange={(e) => setTestEmailRecipient(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-[#2B2B30] rounded-lg dark:bg-[#0F0F12] dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Leave blank to send the test email to your login email.</p>
+            </div>
             </div>
 
             <div>
@@ -402,6 +451,14 @@ export default function SettingsPage() {
               className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-medium"
             >
               Save Company Settings
+            </button>
+
+            <button
+              onClick={handleSendTestEmail}
+              disabled={testEmailLoading}
+              className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg transition font-medium"
+            >
+              {testEmailLoading ? 'Sending Test Email...' : 'Send Test Email'}
             </button>
           </div>
         </div>

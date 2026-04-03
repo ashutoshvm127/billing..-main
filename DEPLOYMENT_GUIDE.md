@@ -262,11 +262,33 @@ pnpm add html2pdf.js
 - Check AI model availability
 
 ### Issue: Email not sending
-- Currently in demo mode (logs to console)
-- To enable real emails, integrate email service:
-  - Resend: `pnpm add resend`
-  - SendGrid: `pnpm add @sendgrid/mail`
-  - Update `/api/send-invoice/route.ts`
+- SMTP is implemented in `/api/send-invoice/route.ts` using `nodemailer`
+- Configure these environment variables:
+  - `SMTP_HOST`
+  - `SMTP_PORT`
+  - `SMTP_SECURE` (`true` for SSL/465, `false` for STARTTLS/587)
+  - `SMTP_USER`
+  - `SMTP_PASS`
+  - `MAIL_FROM`
+- Gmail setup example:
+  - `SMTP_HOST=smtp.gmail.com`
+  - `SMTP_PORT=587`
+  - `SMTP_SECURE=false`
+  - `SMTP_USER=<your_gmail_address>`
+  - `SMTP_PASS=<your_google_app_password>`
+  - `MAIL_FROM=<your_gmail_address>`
+
+### Issue: Email goes to spam
+- Use authenticated domain email instead of personal mailbox for production.
+- Ensure `MAIL_FROM` matches your authenticated sending identity.
+- Publish DNS records for your sender domain:
+  - SPF: authorize your SMTP provider.
+  - DKIM: enable signing in your SMTP provider and publish DKIM TXT records.
+  - DMARC: start with `p=none`, monitor, then move to `quarantine/reject`.
+- Keep `MAIL_FROM_NAME` human and brand-consistent (for example, `Acme Billing`).
+- Set `MAIL_REPLY_TO` to a monitored inbox.
+- Avoid spammy subjects (all-caps, excessive punctuation).
+- Warm up new sender domains/IPs by sending low volume first.
 
 ---
 

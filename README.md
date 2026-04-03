@@ -341,7 +341,10 @@ A: Yes, download backup from browser console or settings page.
 A: Partially. Core features work, but AI analytics require internet.
 
 **Q: How do I send real emails?**
-A: Integrate an email service (Resend, SendGrid) in `/api/send-invoice/route.ts`
+A: SMTP is supported in `/api/send-invoice/route.ts` via `nodemailer`. Configure env vars:
+`SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`.
+For Gmail, use App Password with:
+`SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_SECURE=false`.
 
 **Q: Can I customize the invoice template?**
 A: Yes, edit `/components/invoices/invoice-preview-enhanced.tsx`
