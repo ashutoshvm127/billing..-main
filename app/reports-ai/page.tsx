@@ -2,13 +2,14 @@
 
 import { ProtectedLayout } from '@/components/protected-layout'
 import { Button } from '@/components/ui/button'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Sparkles, TrendingUp, AlertCircle, CheckCircle } from 'lucide-react'
 import { useAuth } from '@/context/auth-context'
 import { useCurrency } from '@/context/currency-context'
-import { getInvoices } from '@/lib/billing-store'
+import { BILLING_DATA_CHANGE_KEY, getInvoices } from '@/lib/billing-store'
 import { formatCurrency } from '@/lib/currency'
 import { CurrencyCode } from '@/types/invoice'
+import { useBillingRealtime } from '@/hooks/use-billing-realtime'
 
 interface Metrics {
   totalRevenue: number
@@ -29,33 +30,56 @@ export default function ReportsAIPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>('')
 
+  const loadData = useCallback(async () => {
+    if (!user?.id) return
+
+    const invoicesList = await getInvoices(user.id)
+    setInvoices(invoicesList)
+
+    const totalRevenue = invoicesList.reduce((sum: number, inv: any) => sum + inv.totalAmount, 0)
+    const paidInvoices = invoicesList.filter((inv: any) => inv.status === 'paid').length
+    const pendingInvoices = invoicesList.filter((inv: any) => inv.status === 'sent' || inv.status === 'overdue').length
+    const overdueAmount = invoicesList
+      .filter((inv: any) => inv.status === 'overdue')
+      .reduce((sum: number, inv: any) => sum + inv.totalAmount, 0)
+
+    setMetrics({
+      totalRevenue,
+      totalInvoices: invoicesList.length,
+      paidInvoices,
+      pendingInvoices,
+      averageInvoiceValue: invoicesList.length > 0 ? totalRevenue / invoicesList.length : 0,
+      collectionRate: invoicesList.length > 0 ? (paidInvoices / invoicesList.length) * 100 : 0,
+      overdueAmount
+    })
+  }, [user?.id])
+
+  useBillingRealtime(user?.id, ['invoices', 'payments'], loadData)
+
   useEffect(() => {
-    const loadData = async () => {
-      if (!user?.id) return
+    loadData()
+  }, [loadData])
 
-      const invoicesList = await getInvoices(user.id)
-      setInvoices(invoicesList)
-
-      const totalRevenue = invoicesList.reduce((sum: number, inv: any) => sum + inv.totalAmount, 0)
-      const paidInvoices = invoicesList.filter((inv: any) => inv.status === 'paid').length
-      const pendingInvoices = invoicesList.filter((inv: any) => inv.status === 'sent' || inv.status === 'overdue').length
-      const overdueAmount = invoicesList
-        .filter((inv: any) => inv.status === 'overdue')
-        .reduce((sum: number, inv: any) => sum + inv.totalAmount, 0)
-
-      setMetrics({
-        totalRevenue,
-        totalInvoices: invoicesList.length,
-        paidInvoices,
-        pendingInvoices,
-        averageInvoiceValue: invoicesList.length > 0 ? totalRevenue / invoicesList.length : 0,
-        collectionRate: invoicesList.length > 0 ? (paidInvoices / invoicesList.length) * 100 : 0,
-        overdueAmount
-      })
+  useEffect(() => {
+    const onBillingDataChanged = (event?: Event) => {
+      if (event instanceof StorageEvent && event.key !== BILLING_DATA_CHANGE_KEY) return
+      loadData()
     }
 
-    loadData()
-  }, [user?.id])
+    const onWindowFocus = () => {
+      loadData()
+    }
+
+    window.addEventListener('billing:data-changed', onBillingDataChanged as EventListener)
+    window.addEventListener('storage', onBillingDataChanged as EventListener)
+    window.addEventListener('focus', onWindowFocus)
+
+    return () => {
+      window.removeEventListener('billing:data-changed', onBillingDataChanged as EventListener)
+      window.removeEventListener('storage', onBillingDataChanged as EventListener)
+      window.removeEventListener('focus', onWindowFocus)
+    }
+  }, [loadData])
 
   const generateInsights = async () => {
     if (!metrics) return

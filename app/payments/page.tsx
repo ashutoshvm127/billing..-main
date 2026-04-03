@@ -2,13 +2,14 @@
 
 import { ProtectedLayout } from "@/components/protected-layout"
 import { PageNavigation } from "@/components/page-navigation"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Plus, Trash2, CheckCircle, AlertCircle } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { useCurrency } from "@/context/currency-context"
 import { Invoice } from "@/types/invoice"
 import { Payment } from "@/types/billing"
-import { addPayment, deletePayment, getInvoices, getPayments, setInvoicePaidByNumber, setInvoiceStatusByNumber, upsertPayment } from "@/lib/billing-store"
+import { BILLING_DATA_CHANGE_KEY, addPayment, deletePayment, getInvoices, getPayments, setInvoicePaidByNumber, setInvoiceStatusByNumber, upsertPayment } from "@/lib/billing-store"
+import { useBillingRealtime } from "@/hooks/use-billing-realtime"
 import { formatCurrency } from "@/lib/currency"
 import { CurrencyCode } from "@/types/invoice"
 
@@ -24,20 +25,43 @@ export default function PaymentsPage() {
   } | null>(null)
   const [undoMessage, setUndoMessage] = useState<string | null>(null)
 
-  useEffect(() => {
-    const load = async () => {
-      if (!user?.id) return
-      const [loadedPayments, loadedInvoices] = await Promise.all([
-        getPayments(user.id),
-        getInvoices(user.id)
-      ])
+  const loadPaymentsData = useCallback(async () => {
+    if (!user?.id) return
+    const [loadedPayments, loadedInvoices] = await Promise.all([
+      getPayments(user.id),
+      getInvoices(user.id)
+    ])
 
-      setPayments(loadedPayments)
-      setUnpaidInvoices(loadedInvoices.filter((inv) => inv.status !== 'paid'))
+    setPayments(loadedPayments)
+    setUnpaidInvoices(loadedInvoices.filter((inv) => inv.status !== 'paid'))
+  }, [user?.id])
+
+  useBillingRealtime(user?.id, ['invoices', 'payments', 'quotes'], loadPaymentsData)
+
+  useEffect(() => {
+    loadPaymentsData()
+  }, [loadPaymentsData])
+
+  useEffect(() => {
+    const onBillingDataChanged = (event?: Event) => {
+      if (event instanceof StorageEvent && event.key !== BILLING_DATA_CHANGE_KEY) return
+      loadPaymentsData()
     }
 
-    load()
-  }, [user?.id])
+    const onWindowFocus = () => {
+      loadPaymentsData()
+    }
+
+    window.addEventListener('billing:data-changed', onBillingDataChanged as EventListener)
+    window.addEventListener('storage', onBillingDataChanged as EventListener)
+    window.addEventListener('focus', onWindowFocus)
+
+    return () => {
+      window.removeEventListener('billing:data-changed', onBillingDataChanged as EventListener)
+      window.removeEventListener('storage', onBillingDataChanged as EventListener)
+      window.removeEventListener('focus', onWindowFocus)
+    }
+  }, [loadPaymentsData])
 
   const [showForm, setShowForm] = useState(false)
   const [formData, setFormData] = useState({

@@ -6,6 +6,8 @@ import Link from "next/link"
 import { useCurrency } from "@/context/currency-context"
 import { useAuth } from "@/context/auth-context"
 import { getInvoices } from "@/lib/billing-store"
+import { BILLING_DATA_CHANGE_KEY } from "@/lib/billing-store"
+import { useBillingRealtime } from "@/hooks/use-billing-realtime"
 import { convertCurrency, formatCurrency } from "@/lib/currency"
 import { CurrencyCode } from "@/types/invoice"
 
@@ -64,12 +66,15 @@ export default function Content() {
     })
   }, [user?.id, selectedCurrencyCode, exchangeRates])
 
+  useBillingRealtime(user?.id, ['invoices', 'payments', 'quotes'], loadDashboardData)
+
   useEffect(() => {
     loadDashboardData()
   }, [loadDashboardData])
 
   useEffect(() => {
-    const onBillingDataChanged = () => {
+    const onBillingDataChanged = (event?: Event) => {
+      if (event instanceof StorageEvent && event.key !== BILLING_DATA_CHANGE_KEY) return
       loadDashboardData()
     }
 
@@ -78,10 +83,12 @@ export default function Content() {
     }
 
     window.addEventListener('billing:data-changed', onBillingDataChanged as EventListener)
+    window.addEventListener('storage', onBillingDataChanged as EventListener)
     window.addEventListener('focus', onWindowFocus)
 
     return () => {
       window.removeEventListener('billing:data-changed', onBillingDataChanged as EventListener)
+      window.removeEventListener('storage', onBillingDataChanged as EventListener)
       window.removeEventListener('focus', onWindowFocus)
     }
   }, [loadDashboardData])

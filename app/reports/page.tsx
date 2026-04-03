@@ -2,14 +2,15 @@
 
 import { ProtectedLayout } from "@/components/protected-layout"
 import { PageNavigation } from "@/components/page-navigation"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { TrendingUp, DollarSign, FileText, Clock, Download } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { useCurrency } from "@/context/currency-context"
-import { getInvoices, saveReportSnapshot } from "@/lib/billing-store"
+import { BILLING_DATA_CHANGE_KEY, getInvoices, saveReportSnapshot } from "@/lib/billing-store"
 import { formatCurrency } from "@/lib/currency"
 import { CurrencyCode } from "@/types/invoice"
+import { useBillingRealtime } from "@/hooks/use-billing-realtime"
 
 interface Invoice {
   id: string
@@ -33,66 +34,89 @@ export default function ReportsPage() {
   const [chartData, setChartData] = useState([])
   const [statusData, setStatusData] = useState([])
 
+  const loadReportsData = useCallback(async () => {
+    if (!user?.id) return
+
+    const invoicesList = await getInvoices(user.id)
+    setInvoices(invoicesList)
+
+    // Calculate stats
+    const totalRevenue = invoicesList.reduce((sum: number, inv: Invoice) => sum + inv.amount, 0)
+    const paidAmount = invoicesList
+      .filter((inv: Invoice) => inv.status === 'paid')
+      .reduce((sum: number, inv: Invoice) => sum + inv.amount, 0)
+    const pendingAmount = totalRevenue - paidAmount
+
+    setStats({
+      totalRevenue,
+      totalInvoices: invoicesList.length,
+      paidAmount,
+      pendingAmount
+    })
+
+    // Prepare chart data - monthly revenue
+    const monthlyData: { [key: string]: number } = {}
+    invoicesList.forEach((inv: Invoice) => {
+      const month = new Date(inv.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
+      monthlyData[month] = (monthlyData[month] || 0) + inv.amount
+    })
+
+    const chartDataArray = Object.entries(monthlyData).map(([month, amount]) => ({
+      month,
+      revenue: amount
+    }))
+    setChartData(chartDataArray)
+
+    // Status breakdown
+    const statusBreakdown: { [key: string]: number } = {}
+    invoicesList.forEach((inv: Invoice) => {
+      statusBreakdown[inv.status] = (statusBreakdown[inv.status] || 0) + 1
+    })
+
+    const statusDataArray = Object.entries(statusBreakdown).map(([status, count]) => ({
+      name: status.charAt(0).toUpperCase() + status.slice(1),
+      value: count
+    }))
+    setStatusData(statusDataArray)
+
+    await saveReportSnapshot({
+      id: `report-${user.id}`,
+      userId: user.id,
+      totalRevenue,
+      totalInvoices: invoicesList.length,
+      paidAmount,
+      pendingAmount,
+      amountCollected: paidAmount,
+      createdAt: new Date().toISOString(),
+    })
+  }, [user?.id])
+
+  useBillingRealtime(user?.id, ['invoices', 'payments'], loadReportsData)
+
   useEffect(() => {
-    const loadReportsData = async () => {
-      if (!user?.id) return
+    loadReportsData()
+  }, [loadReportsData])
 
-      const invoicesList = await getInvoices(user.id)
-      setInvoices(invoicesList)
-
-      // Calculate stats
-      const totalRevenue = invoicesList.reduce((sum: number, inv: Invoice) => sum + inv.amount, 0)
-      const paidAmount = invoicesList
-        .filter((inv: Invoice) => inv.status === 'paid')
-        .reduce((sum: number, inv: Invoice) => sum + inv.amount, 0)
-      const pendingAmount = totalRevenue - paidAmount
-
-      setStats({
-        totalRevenue,
-        totalInvoices: invoicesList.length,
-        paidAmount,
-        pendingAmount
-      })
-
-      // Prepare chart data - monthly revenue
-      const monthlyData: { [key: string]: number } = {}
-      invoicesList.forEach((inv: Invoice) => {
-        const month = new Date(inv.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
-        monthlyData[month] = (monthlyData[month] || 0) + inv.amount
-      })
-
-      const chartDataArray = Object.entries(monthlyData).map(([month, amount]) => ({
-        month,
-        revenue: amount
-      }))
-      setChartData(chartDataArray)
-
-      // Status breakdown
-      const statusBreakdown: { [key: string]: number } = {}
-      invoicesList.forEach((inv: Invoice) => {
-        statusBreakdown[inv.status] = (statusBreakdown[inv.status] || 0) + 1
-      })
-
-      const statusDataArray = Object.entries(statusBreakdown).map(([status, count]) => ({
-        name: status.charAt(0).toUpperCase() + status.slice(1),
-        value: count
-      }))
-      setStatusData(statusDataArray)
-
-      await saveReportSnapshot({
-        id: `report-${user.id}`,
-        userId: user.id,
-        totalRevenue,
-        totalInvoices: invoicesList.length,
-        paidAmount,
-        pendingAmount,
-        amountCollected: paidAmount,
-        createdAt: new Date().toISOString(),
-      })
+  useEffect(() => {
+    const onBillingDataChanged = (event?: Event) => {
+      if (event instanceof StorageEvent && event.key !== BILLING_DATA_CHANGE_KEY) return
+      loadReportsData()
     }
 
-    loadReportsData()
-  }, [user?.id])
+    const onWindowFocus = () => {
+      loadReportsData()
+    }
+
+    window.addEventListener('billing:data-changed', onBillingDataChanged as EventListener)
+    window.addEventListener('storage', onBillingDataChanged as EventListener)
+    window.addEventListener('focus', onWindowFocus)
+
+    return () => {
+      window.removeEventListener('billing:data-changed', onBillingDataChanged as EventListener)
+      window.removeEventListener('storage', onBillingDataChanged as EventListener)
+      window.removeEventListener('focus', onWindowFocus)
+    }
+  }, [loadReportsData])
 
   const colors = ['#3B82F6', '#10B981', '#EF4444', '#F59E0B']
 

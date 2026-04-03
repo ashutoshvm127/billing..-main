@@ -2,14 +2,15 @@
 
 import { ProtectedLayout } from "@/components/protected-layout"
 import { PageNavigation } from "@/components/page-navigation"
-import { useState, useEffect } from "react"
+import { useCallback, useState, useEffect } from "react"
 import { Plus, Edit2, Trash2, Eye, ReceiptText } from "lucide-react"
 import EnhancedInvoiceForm from "@/components/invoices/enhanced-invoice-form"
 import InvoicePreview from "@/components/invoices/invoice-preview-enhanced"
 import { useAuth } from "@/context/auth-context"
 import { Quote } from "@/types/billing"
-import { deleteQuote, getQuotes, upsertInvoice, upsertQuote } from "@/lib/billing-store"
+import { BILLING_DATA_CHANGE_KEY, deleteQuote, getQuotes, upsertInvoice, upsertQuote } from "@/lib/billing-store"
 import { Invoice } from "@/types/invoice"
+import { useBillingRealtime } from "@/hooks/use-billing-realtime"
 
 export default function QuotesPage() {
   const { user } = useAuth()
@@ -19,15 +20,36 @@ export default function QuotesPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [savedMessage, setSavedMessage] = useState('')
 
+  const loadQuotes = useCallback(async () => {
+    if (!user?.id) return
+    const loaded = await getQuotes(user.id)
+    setQuotes(loaded)
+  }, [user?.id])
+
   useEffect(() => {
-    const loadQuotes = async () => {
-      if (!user?.id) return
-      const loaded = await getQuotes(user.id)
-      setQuotes(loaded)
+    loadQuotes()
+  }, [loadQuotes])
+
+  useEffect(() => {
+    const onBillingDataChanged = (event?: Event) => {
+      if (event instanceof StorageEvent && event.key !== BILLING_DATA_CHANGE_KEY) return
+      loadQuotes()
     }
 
-    loadQuotes()
-  }, [user?.id])
+    const onWindowFocus = () => {
+      loadQuotes()
+    }
+
+    window.addEventListener('billing:data-changed', onBillingDataChanged as EventListener)
+    window.addEventListener('storage', onBillingDataChanged as EventListener)
+    window.addEventListener('focus', onWindowFocus)
+
+    return () => {
+      window.removeEventListener('billing:data-changed', onBillingDataChanged as EventListener)
+      window.removeEventListener('storage', onBillingDataChanged as EventListener)
+      window.removeEventListener('focus', onWindowFocus)
+    }
+  }, [loadQuotes])
 
   const generateQuoteNumber = () => {
     return `QT-${Date.now().toString().slice(-8)}`
