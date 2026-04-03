@@ -19,7 +19,6 @@ interface DataRow<T> {
 
 const MIGRATION_VERSION = 'v1'
 
-
 function normalizeInvoiceStatus(invoice: Invoice): Invoice {
   if ((invoice as any).status === 'draft') {
     return {
@@ -30,11 +29,12 @@ function normalizeInvoiceStatus(invoice: Invoice): Invoice {
 
   return invoice
 }
+
 function isBrowser() {
   return typeof window !== 'undefined'
 }
 
-    return readLocal<Invoice>(STORAGE_KEYS.invoices).map(normalizeInvoiceStatus)
+function readLocal<T>(key: string): T[] {
   if (!isBrowser()) return []
   const raw = localStorage.getItem(key)
   if (!raw) return []
@@ -46,7 +46,7 @@ function isBrowser() {
   }
 }
 
-    return readLocal<Invoice>(STORAGE_KEYS.invoices).map(normalizeInvoiceStatus)
+function writeLocal<T>(key: string, value: T[]): void {
   if (!isBrowser()) return
   localStorage.setItem(key, JSON.stringify(value))
 }
@@ -56,13 +56,10 @@ function getMigrationKey(scope: string) {
 }
 
 async function migrateUsersToSupabaseIfNeeded(): Promise<void> {
-  const normalizedInvoice = normalizeInvoiceStatus(invoice)
   const supabase = getSupabaseClient()
   if (!supabase || !isBrowser()) return
-  const exists = local.find((inv) => inv.id === normalizedInvoice.id)
-  const nextLocal = exists
-    ? local.map((inv) => (inv.id === normalizedInvoice.id ? normalizedInvoice : inv))
-    : [...local, normalizedInvoice]
+
+  const migrationKey = getMigrationKey('users')
   if (localStorage.getItem(migrationKey) === '1') return
 
   const localUsers = readLocal<UserAccess>(STORAGE_KEYS.users)
@@ -71,8 +68,8 @@ async function migrateUsersToSupabaseIfNeeded(): Promise<void> {
       localUsers.map((user) => ({
         id: user.id,
         email: user.email,
-      created_at: normalizedInvoice.createdAt || new Date().toISOString(),
-      data: normalizedInvoice,
+        password: user.password,
+        role: user.role,
         access_level: user.accessLevel,
         created_at: user.createdAt,
         company_name: user.companyName || null,
@@ -90,22 +87,21 @@ export async function migrateLocalDataToSupabaseIfNeeded(userId: string): Promis
 
   await migrateUsersToSupabaseIfNeeded()
 
+  const migrationKey = getMigrationKey(`data:${userId}`)
+  if (localStorage.getItem(migrationKey) === '1') return
+
+  const invoices = readLocal<Invoice>(STORAGE_KEYS.invoices)
+  if (invoices.length > 0) {
+    await supabase.from('invoices').upsert(
       invoices.map((invoice) => {
         const normalizedInvoice = normalizeInvoiceStatus(invoice)
         return {
-  if (localStorage.getItem(migrationKey) === '1') return
-
-        created_at: normalizedInvoice.createdAt || new Date().toISOString(),
-        data: normalizedInvoice,
+          id: normalizedInvoice.id,
+          user_id: userId,
+          created_at: normalizedInvoice.createdAt || new Date().toISOString(),
+          data: normalizedInvoice,
         }
       }),
-    await supabase.from('invoices').upsert(
-      invoices.map((invoice) => ({
-        id: invoice.id,
-        user_id: userId,
-        created_at: invoice.createdAt || new Date().toISOString(),
-        data: invoice,
-      })),
       { onConflict: 'id' }
     )
   }
@@ -154,7 +150,9 @@ export async function migrateLocalDataToSupabaseIfNeeded(userId: string): Promis
 
 export async function getInvoices(userId: string): Promise<Invoice[]> {
   const supabase = getSupabaseClient()
-  if (!supabase) return readLocal<Invoice>(STORAGE_KEYS.invoices)
+  if (!supabase) {
+    return readLocal<Invoice>(STORAGE_KEYS.invoices).map(normalizeInvoiceStatus)
+  }
 
   await migrateLocalDataToSupabaseIfNeeded(userId)
 
@@ -165,30 +163,33 @@ export async function getInvoices(userId: string): Promise<Invoice[]> {
     .order('created_at', { ascending: true })
 
   if (error || !data) {
-    return readLocal<Invoice>(STORAGE_KEYS.invoices)
+    return readLocal<Invoice>(STORAGE_KEYS.invoices).map(normalizeInvoiceStatus)
   }
 
-  const invoices = (data as DataRow<Invoice>[]).map((row) => row.data)
+  const invoices = (data as DataRow<Invoice>[]).map((row) => normalizeInvoiceStatus(row.data))
   writeLocal(STORAGE_KEYS.invoices, invoices)
   return invoices
 }
 
 export async function upsertInvoice(userId: string, invoice: Invoice): Promise<void> {
   const supabase = getSupabaseClient()
+  const normalizedInvoice = normalizeInvoiceStatus(invoice)
 
   const local = readLocal<Invoice>(STORAGE_KEYS.invoices)
-  const exists = local.find((inv) => inv.id === invoice.id)
-  const nextLocal = exists ? local.map((inv) => (inv.id === invoice.id ? invoice : inv)) : [...local, invoice]
+  const exists = local.find((inv) => inv.id === normalizedInvoice.id)
+  const nextLocal = exists
+    ? local.map((inv) => (inv.id === normalizedInvoice.id ? normalizedInvoice : inv))
+    : [...local, normalizedInvoice]
   writeLocal(STORAGE_KEYS.invoices, nextLocal)
 
   if (!supabase) return
 
   await supabase.from('invoices').upsert(
     {
-      id: invoice.id,
+      id: normalizedInvoice.id,
       user_id: userId,
-      created_at: invoice.createdAt || new Date().toISOString(),
-      data: invoice,
+      created_at: normalizedInvoice.createdAt || new Date().toISOString(),
+      data: normalizedInvoice,
     },
     { onConflict: 'id' }
   )
