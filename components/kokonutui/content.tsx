@@ -38,6 +38,8 @@ export default function Content() {
   }
   const formatCurrencyForSelected = (amount: number, sourceCurrency?: string) =>
     formatCurrency(toSelectedCurrency(amount, sourceCurrency), selectedCurrencyCode)
+  const formatInSelectedCurrency = (amount: number) =>
+    formatCurrency(amount, selectedCurrencyCode)
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -74,7 +76,7 @@ export default function Content() {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-gray-500 dark:text-gray-400 text-xs font-medium uppercase tracking-wide">Total Revenue ({selectedCurrency})</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-1">{formatCurrencyForSelected(stats.totalRevenue)}</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-1">{formatInSelectedCurrency(stats.totalRevenue)}</p>
             </div>
             <div className="p-2.5 bg-blue-100 dark:bg-blue-500/15 rounded-lg group-hover:scale-105 transition-transform">
               <DollarSign className="w-5 h-5 text-blue-600 dark:text-blue-400" />
@@ -99,7 +101,7 @@ export default function Content() {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-gray-500 dark:text-gray-400 text-xs font-medium uppercase tracking-wide">Unpaid ({selectedCurrency})</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-1">{formatCurrencyForSelected(stats.overdueAmount)}</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-1">{formatInSelectedCurrency(stats.overdueAmount)}</p>
               <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">{stats.unpaidCount} invoice{stats.unpaidCount !== 1 ? 's' : ''} pending payment</p>
             </div>
             <div className="p-2.5 bg-amber-100 dark:bg-amber-500/15 rounded-lg group-hover:scale-105 transition-transform">
