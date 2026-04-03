@@ -77,6 +77,25 @@ export default function InvoicePreview({ invoice }: { invoice: Invoice }) {
   const isPaid = invoice.status === 'paid'
   const isOverdue = invoice.status === 'overdue'
 
+  const pseudoRandom = (seed: string, index: number, min: number, max: number): number => {
+    let hash = 0
+    const value = `${seed}-${index}`
+    for (let i = 0; i < value.length; i++) {
+      hash = ((hash << 5) - hash) + value.charCodeAt(i)
+      hash |= 0
+    }
+    const normalized = Math.abs(hash % 1000) / 1000
+    return min + (max - min) * normalized
+  }
+
+  const watermarkPositions = Array.from({ length: 4 }, (_, index) => ({
+    top: pseudoRandom(invoice.invoiceNumber || 'INV', index + 1, 18, 82),
+    left: pseudoRandom(invoice.invoiceNumber || 'INV', index + 11, 18, 82),
+    rotate: pseudoRandom(invoice.invoiceNumber || 'INV', index + 21, -28, 28),
+    size: pseudoRandom(invoice.invoiceNumber || 'INV', index + 31, 180, 260),
+    opacity: pseudoRandom(invoice.invoiceNumber || 'INV', index + 41, 0.025, 0.055),
+  }))
+
   return (
     <div className="space-y-4">
       <div className="flex gap-2 flex-wrap print:hidden">
@@ -99,18 +118,27 @@ export default function InvoicePreview({ invoice }: { invoice: Invoice }) {
         className="bg-white text-gray-900 print:p-0 relative" 
         style={{ fontFamily: 'Arial, sans-serif', maxWidth: '800px', fontSize: '12px' }}
       >
-        {/* Watermark */}
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          opacity: 0.04,
-          pointerEvents: 'none',
-          zIndex: 0,
-        }}>
-          <img src="/logo.png" alt="" style={{ width: '300px', height: '300px', objectFit: 'contain' }} />
-        </div>
+        {/* Watermarks */}
+        {watermarkPositions.map((mark, index) => (
+          <div
+            key={`watermark-${index}`}
+            style={{
+              position: 'absolute',
+              top: `${mark.top}%`,
+              left: `${mark.left}%`,
+              transform: `translate(-50%, -50%) rotate(${mark.rotate}deg)`,
+              opacity: mark.opacity,
+              pointerEvents: 'none',
+              zIndex: 0,
+            }}
+          >
+            <img
+              src="/logo.png"
+              alt=""
+              style={{ width: `${mark.size}px`, height: `${mark.size}px`, objectFit: 'contain' }}
+            />
+          </div>
+        ))}
 
         {/* Main Content */}
         <div style={{ position: 'relative', zIndex: 1, padding: '40px' }}>
