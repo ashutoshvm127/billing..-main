@@ -25,7 +25,14 @@ interface CompanySettings {
 
 export default function SettingsPage() {
   const { user, logout } = useAuth()
-  const { geminiApiKey, setGeminiApiKey, selectedCurrency, setCurrency } = useCurrency()
+  const {
+    geminiApiKey,
+    setGeminiApiKey,
+    selectedCurrency,
+    setCurrency,
+    exchangeRatesUpdatedAt,
+    exchangeRatesSyncing,
+  } = useCurrency()
   const { paymentSettings, setPaymentSettings, companySettings, setCompanySettings, notificationSettings, setNotificationSettings } = useSettings()
   const router = useRouter()
   const [savedMessage, setSavedMessage] = useState('')
@@ -314,6 +321,14 @@ export default function SettingsPage() {
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
                 All invoice totals are locked at creation time and won't change with exchange rate fluctuations.
               </p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                Exchange rates status: {exchangeRatesSyncing ? 'Syncing from Gemini...' : 'Ready'}
+              </p>
+              {exchangeRatesUpdatedAt && (
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  Last updated: {new Date(exchangeRatesUpdatedAt).toLocaleString()}
+                </p>
+              )}
             </div>
             <button
               onClick={() => {
