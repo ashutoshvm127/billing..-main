@@ -6,6 +6,8 @@ import Link from "next/link"
 import { useCurrency } from "@/context/currency-context"
 import { useAuth } from "@/context/auth-context"
 import { getInvoices } from "@/lib/billing-store"
+import { formatCurrency } from "@/lib/currency"
+import { CurrencyCode } from "@/types/invoice"
 
 interface Invoice {
   id: string
@@ -29,25 +31,7 @@ export default function Content() {
     unpaidCount: 0
   })
 
-  const getCurrencySymbol = (currency: string) => {
-    const symbols: { [key: string]: string } = {
-      'INR': '₹',
-      'USD': '$',
-      'EUR': '€',
-      'GBP': '£',
-      'AUD': 'A$',
-      'CAD': 'C$',
-      'SGD': 'S$',
-      'AED': 'د.إ',
-      'JPY': '¥',
-      'CHF': 'CHF'
-    }
-    return symbols[currency] || '$'
-  }
-
-  const formatCurrency = (amount: number) => {
-    return `${getCurrencySymbol(selectedCurrency)}${amount.toFixed(2)}`
-  }
+  const formatCurrencyForSelected = (amount: number) => formatCurrency(amount, selectedCurrency as CurrencyCode)
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -84,7 +68,7 @@ export default function Content() {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-gray-500 dark:text-gray-400 text-xs font-medium uppercase tracking-wide">Total Revenue ({selectedCurrency})</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-1">{formatCurrency(stats.totalRevenue)}</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-1">{formatCurrencyForSelected(stats.totalRevenue)}</p>
             </div>
             <div className="p-2.5 bg-blue-100 dark:bg-blue-500/15 rounded-lg group-hover:scale-105 transition-transform">
               <DollarSign className="w-5 h-5 text-blue-600 dark:text-blue-400" />
@@ -109,7 +93,7 @@ export default function Content() {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-gray-500 dark:text-gray-400 text-xs font-medium uppercase tracking-wide">Unpaid ({selectedCurrency})</p>
-              <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-1">{formatCurrency(stats.overdueAmount)}</p>
+              <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-1">{formatCurrencyForSelected(stats.overdueAmount)}</p>
               <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">{stats.unpaidCount} invoice{stats.unpaidCount !== 1 ? 's' : ''} pending payment</p>
             </div>
             <div className="p-2.5 bg-amber-100 dark:bg-amber-500/15 rounded-lg group-hover:scale-105 transition-transform">
@@ -135,7 +119,7 @@ export default function Content() {
                   <p className="text-xs text-gray-600 dark:text-gray-400">{invoice.clientName}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-gray-900 dark:text-white">{formatCurrency(invoice.amount)}</p>
+                  <p className="font-bold text-gray-900 dark:text-white">{formatCurrencyForSelected(invoice.amount)}</p>
                   <span className={`text-xs font-semibold px-2 py-1 rounded ${getStatusColor(invoice.status)}`}>
                     {invoice.status}
                   </span>
@@ -166,7 +150,7 @@ export default function Content() {
                   <p className="font-medium text-gray-900 dark:text-white">{invoice.clientName}</p>
                   <p className="text-xs text-gray-600 dark:text-gray-400">Due: {new Date(invoice.dueDate).toLocaleDateString()}</p>
                 </div>
-                <p className="font-bold text-gray-900 dark:text-white">{formatCurrency(invoice.amount)}</p>
+                <p className="font-bold text-gray-900 dark:text-white">{formatCurrencyForSelected(invoice.amount)}</p>
               </div>
             ))}
             {invoices.filter(inv => inv.status === 'sent' || inv.status === 'overdue').length === 0 && (

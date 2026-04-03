@@ -3,12 +3,13 @@
 import { ProtectedLayout } from "@/components/protected-layout"
 import { PageNavigation } from "@/components/page-navigation"
 import { useState, useEffect } from "react"
-import { Plus, Edit2, Trash2, Eye } from "lucide-react"
+import { Plus, Edit2, Trash2, Eye, ReceiptText } from "lucide-react"
 import EnhancedInvoiceForm from "@/components/invoices/enhanced-invoice-form"
 import InvoicePreview from "@/components/invoices/invoice-preview-enhanced"
 import { useAuth } from "@/context/auth-context"
 import { Quote } from "@/types/billing"
-import { deleteQuote, getQuotes, upsertQuote } from "@/lib/billing-store"
+import { deleteQuote, getQuotes, upsertInvoice, upsertQuote } from "@/lib/billing-store"
+import { Invoice } from "@/types/invoice"
 
 export default function QuotesPage() {
   const { user } = useAuth()
@@ -16,6 +17,7 @@ export default function QuotesPage() {
   const [showForm, setShowForm] = useState(false)
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [savedMessage, setSavedMessage] = useState('')
 
   useEffect(() => {
     const loadQuotes = async () => {
@@ -70,6 +72,49 @@ export default function QuotesPage() {
     setShowForm(true)
   }
 
+  const handleMakeFinalBill = async (quote: Quote) => {
+    if (!user?.id) return
+
+    const invoice: Invoice = {
+      id: Math.random().toString(36).substr(2, 9),
+      invoiceNumber: `INV-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 100000)).padStart(5, '0')}`,
+      clientName: quote.clientName,
+      clientEmail: quote.clientEmail,
+      clientAddress: quote.companyAddress || '',
+      clientPhone: quote.companyPhone || '',
+      amount: quote.totalAmount || quote.amount,
+      status: 'overdue',
+      dueDate: quote.expiryDate || new Date().toISOString().split('T')[0],
+      createdAt: new Date().toISOString(),
+      items: (quote.items || []) as any,
+      notes: quote.notes,
+      companyName: quote.companyName,
+      companyEmail: quote.companyEmail,
+      companyPhone: quote.companyPhone,
+      companyAddress: quote.companyAddress,
+      taxRate: quote.taxRate || 0,
+      subtotal: quote.subtotal || quote.amount,
+      taxAmount: quote.taxAmount || 0,
+      totalAmount: quote.totalAmount || quote.amount,
+      currency: (quote.currency || 'INR') as any,
+      upiId: quote.upiId,
+    }
+
+    const updatedQuote: Quote = {
+      ...quote,
+      status: 'accepted',
+    }
+
+    await Promise.all([
+      upsertInvoice(user.id, invoice),
+      upsertQuote(user.id, updatedQuote),
+    ])
+
+    setQuotes((prev) => prev.map((q) => (q.id === quote.id ? updatedQuote : q)))
+    setSavedMessage(`Final bill ${invoice.invoiceNumber} created from ${quote.quoteNumber}`)
+    setTimeout(() => setSavedMessage(''), 3000)
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'draft': return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
@@ -107,6 +152,12 @@ export default function QuotesPage() {
             Create Quote
           </button>
         </div>
+
+        {savedMessage && (
+          <div className="bg-green-100 dark:bg-green-500/20 border border-green-300 dark:border-green-500/30 text-green-800 dark:text-green-400 px-4 py-3 rounded-lg">
+            {savedMessage}
+          </div>
+        )}
 
         {showForm ? (
           <div className="bg-white dark:bg-[#1F1F23] rounded-xl shadow-lg p-6 border border-gray-200 dark:border-[#2B2B30]">
@@ -174,6 +225,13 @@ export default function QuotesPage() {
                           title="View Quote"
                         >
                           <Eye className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        </button>
+                        <button
+                          onClick={() => handleMakeFinalBill(quote)}
+                          className="p-2 hover:bg-emerald-100 dark:hover:bg-emerald-500/10 rounded-lg transition"
+                          title="Make Final Bill"
+                        >
+                          <ReceiptText className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                         </button>
                         <button
                           onClick={() => handleEditQuote(quote)}

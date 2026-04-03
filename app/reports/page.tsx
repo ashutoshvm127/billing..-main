@@ -6,7 +6,10 @@ import { useEffect, useState } from "react"
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { TrendingUp, DollarSign, FileText, Clock, Download } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
+import { useCurrency } from "@/context/currency-context"
 import { getInvoices, saveReportSnapshot } from "@/lib/billing-store"
+import { formatCurrency } from "@/lib/currency"
+import { CurrencyCode } from "@/types/invoice"
 
 interface Invoice {
   id: string
@@ -19,6 +22,7 @@ interface Invoice {
 
 export default function ReportsPage() {
   const { user } = useAuth()
+  const { selectedCurrency } = useCurrency()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [stats, setStats] = useState({
     totalRevenue: 0,
@@ -122,13 +126,13 @@ INVOICE REPORT
 Generated on: ${new Date().toLocaleDateString()}
 
 SUMMARY
-Total Revenue: $${stats.totalRevenue.toFixed(2)}
+Total Revenue: ${formatCurrency(stats.totalRevenue, selectedCurrency as CurrencyCode)}
 Total Invoices: ${stats.totalInvoices}
-Paid Amount: $${stats.paidAmount.toFixed(2)}
-Pending Amount: $${stats.pendingAmount.toFixed(2)}
+Paid Amount: ${formatCurrency(stats.paidAmount, selectedCurrency as CurrencyCode)}
+Pending Amount: ${formatCurrency(stats.pendingAmount, selectedCurrency as CurrencyCode)}
 
 INVOICE DETAILS
-${invoices.map((inv, i) => `${i + 1}. ${inv.invoiceNumber || 'N/A'} - ${inv.clientName || 'N/A'} - $${inv.amount.toFixed(2)} - ${inv.status} - ${new Date(inv.createdAt).toLocaleDateString()}`).join('\n')}
+${invoices.map((inv, i) => `${i + 1}. ${inv.invoiceNumber || 'N/A'} - ${inv.clientName || 'N/A'} - ${formatCurrency(inv.amount, selectedCurrency as CurrencyCode)} - ${inv.status} - ${new Date(inv.createdAt).toLocaleDateString()}`).join('\n')}
 
 ---
 This is a computer-generated report
@@ -196,7 +200,7 @@ This is a computer-generated report
           <StatCard
             icon={DollarSign}
             label="Total Revenue"
-            value={`$${stats.totalRevenue.toFixed(2)}`}
+            value={formatCurrency(stats.totalRevenue, selectedCurrency as CurrencyCode)}
           />
           <StatCard
             icon={FileText}
@@ -206,13 +210,13 @@ This is a computer-generated report
           <StatCard
             icon={TrendingUp}
             label="Paid Amount"
-            value={`$${stats.paidAmount.toFixed(2)}`}
+            value={formatCurrency(stats.paidAmount, selectedCurrency as CurrencyCode)}
             change={`${stats.totalInvoices > 0 ? ((stats.paidAmount / stats.totalRevenue) * 100).toFixed(1) : 0}% collected`}
           />
           <StatCard
             icon={Clock}
             label="Pending Amount"
-            value={`$${stats.pendingAmount.toFixed(2)}`}
+            value={formatCurrency(stats.pendingAmount, selectedCurrency as CurrencyCode)}
             change={`${stats.totalInvoices > 0 ? ((stats.pendingAmount / stats.totalRevenue) * 100).toFixed(1) : 0}% pending`}
           />
         </div>
@@ -293,7 +297,7 @@ This is a computer-generated report
                     <p className="text-xs text-gray-600 dark:text-gray-400">{new Date(invoice.createdAt).toLocaleDateString()}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-bold text-gray-900 dark:text-white">${invoice.amount.toFixed(2)}</p>
+                    <p className="text-sm font-bold text-gray-900 dark:text-white">{formatCurrency(invoice.amount, selectedCurrency as CurrencyCode)}</p>
                     <span className={`text-xs font-semibold ${getStatusColor(invoice.status)}`}>
                       {invoice.status.toUpperCase()}
                     </span>

@@ -14,6 +14,7 @@ import { deleteInvoice, getInvoices, upsertInvoice } from "@/lib/billing-store"
 export default function InvoicesPage() {
   const { user } = useAuth()
   const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [statusFilter, setStatusFilter] = useState<'all' | 'final-bill' | 'paid'>('all')
 
   useEffect(() => {
     const loadInvoices = async () => {
@@ -83,6 +84,15 @@ export default function InvoicesPage() {
     document.body.removeChild(element)
   }
 
+  const filteredInvoices = invoices.filter((invoice) => {
+    if (statusFilter === 'paid') return invoice.status === 'paid'
+    if (statusFilter === 'final-bill') return invoice.status === 'overdue' || invoice.status === 'sent'
+    return true
+  })
+
+  const totalFinalBills = invoices.filter((invoice) => invoice.status === 'overdue' || invoice.status === 'sent').length
+  const totalPaid = invoices.filter((invoice) => invoice.status === 'paid').length
+
   return (
     <ProtectedLayout>
       <div className="space-y-6">
@@ -115,11 +125,49 @@ export default function InvoicesPage() {
           </div>
         )}
 
+        {/* Invoice Filters */}
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setStatusFilter('all')}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+              statusFilter === 'all'
+                ? 'bg-blue-600 text-white'
+                : 'bg-white dark:bg-[#1F1F23] text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-[#2B2B30]'
+            }`}
+          >
+            All ({invoices.length})
+          </button>
+          <button
+            onClick={() => setStatusFilter('final-bill')}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+              statusFilter === 'final-bill'
+                ? 'bg-red-600 text-white'
+                : 'bg-white dark:bg-[#1F1F23] text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-[#2B2B30]'
+            }`}
+          >
+            Final Bills Pending ({totalFinalBills})
+          </button>
+          <button
+            onClick={() => setStatusFilter('paid')}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+              statusFilter === 'paid'
+                ? 'bg-green-600 text-white'
+                : 'bg-white dark:bg-[#1F1F23] text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-[#2B2B30]'
+            }`}
+          >
+            Paid ({totalPaid})
+          </button>
+        </div>
+
         {/* Invoice List */}
         <div className="bg-white dark:bg-[#1F1F23] rounded-xl shadow-lg border border-gray-200 dark:border-[#2B2B30] overflow-hidden">
-          {invoices.length === 0 ? (
+          {filteredInvoices.length === 0 ? (
             <div className="p-12 text-center">
-              <p className="text-gray-500 dark:text-gray-400">No invoices yet. Create your first invoice!</p>
+              <p className="text-gray-500 dark:text-gray-400">
+                {invoices.length === 0
+                  ? 'No invoices yet. Create your first invoice!'
+                  : 'No invoices found for the selected filter.'}
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -135,7 +183,7 @@ export default function InvoicesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-[#2B2B30]">
-                  {invoices.map((invoice, index) => (
+                  {filteredInvoices.map((invoice) => (
                     <tr key={invoice.id} className="hover:bg-gray-50 dark:hover:bg-[#0F0F12] transition">
                       <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">{invoice.invoiceNumber}</td>
                       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{invoice.clientName}</td>

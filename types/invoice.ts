@@ -19,7 +19,7 @@ export interface Invoice {
   clientAddress: string
   clientPhone: string
   amount: number
-  status: 'draft' | 'sent' | 'paid' | 'overdue'
+  status: 'sent' | 'paid' | 'overdue'
   dueDate: string
   createdAt: string
   createdBy?: string

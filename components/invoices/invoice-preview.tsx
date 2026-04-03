@@ -15,7 +15,7 @@ interface Invoice {
   clientName: string
   clientEmail: string
   amount: number
-  status: 'draft' | 'sent' | 'paid' | 'overdue'
+  status: 'sent' | 'paid' | 'overdue'
   dueDate: string
   items: InvoiceItem[]
   notes: string

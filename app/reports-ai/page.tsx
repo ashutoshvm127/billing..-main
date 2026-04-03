@@ -5,7 +5,10 @@ import { Button } from '@/components/ui/button'
 import { useEffect, useState } from 'react'
 import { Sparkles, TrendingUp, AlertCircle, CheckCircle } from 'lucide-react'
 import { useAuth } from '@/context/auth-context'
+import { useCurrency } from '@/context/currency-context'
 import { getInvoices } from '@/lib/billing-store'
+import { formatCurrency } from '@/lib/currency'
+import { CurrencyCode } from '@/types/invoice'
 
 interface Metrics {
   totalRevenue: number
@@ -19,6 +22,7 @@ interface Metrics {
 
 export default function ReportsAIPage() {
   const { user } = useAuth()
+  const { selectedCurrency } = useCurrency()
   const [metrics, setMetrics] = useState<Metrics | null>(null)
   const [invoices, setInvoices] = useState<any[]>([])
   const [insights, setInsights] = useState<string>('')
@@ -34,7 +38,7 @@ export default function ReportsAIPage() {
 
       const totalRevenue = invoicesList.reduce((sum: number, inv: any) => sum + inv.totalAmount, 0)
       const paidInvoices = invoicesList.filter((inv: any) => inv.status === 'paid').length
-      const pendingInvoices = invoicesList.filter((inv: any) => inv.status === 'sent' || inv.status === 'draft' || inv.status === 'overdue').length
+      const pendingInvoices = invoicesList.filter((inv: any) => inv.status === 'sent' || inv.status === 'overdue').length
       const overdueAmount = invoicesList
         .filter((inv: any) => inv.status === 'overdue')
         .reduce((sum: number, inv: any) => sum + inv.totalAmount, 0)
@@ -110,7 +114,7 @@ export default function ReportsAIPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <MetricCard
             label="Total Revenue"
-            value={`$${metrics.totalRevenue.toFixed(2)}`}
+            value={formatCurrency(metrics.totalRevenue, selectedCurrency as CurrencyCode)}
             icon={TrendingUp}
             trend="up"
           />
@@ -126,7 +130,7 @@ export default function ReportsAIPage() {
           />
           <MetricCard
             label="Overdue Amount"
-            value={`$${metrics.overdueAmount.toFixed(2)}`}
+            value={formatCurrency(metrics.overdueAmount, selectedCurrency as CurrencyCode)}
             icon={AlertCircle}
             trend="down"
           />
@@ -147,7 +151,7 @@ export default function ReportsAIPage() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Average Value</span>
-                <span className="font-semibold">${metrics.averageInvoiceValue.toFixed(2)}</span>
+                <span className="font-semibold">{formatCurrency(metrics.averageInvoiceValue, selectedCurrency as CurrencyCode)}</span>
               </div>
             </div>
           </div>
@@ -158,7 +162,7 @@ export default function ReportsAIPage() {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Monthly Average</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  ${(metrics.totalRevenue / 12).toFixed(0)}
+                  {formatCurrency(metrics.totalRevenue / 12, selectedCurrency as CurrencyCode)}
                 </p>
               </div>
               <div>

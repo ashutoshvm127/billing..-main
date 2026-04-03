@@ -5,12 +5,16 @@ import { PageNavigation } from "@/components/page-navigation"
 import { useEffect, useState } from "react"
 import { Plus, Trash2, CheckCircle, AlertCircle } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
+import { useCurrency } from "@/context/currency-context"
 import { Invoice } from "@/types/invoice"
 import { Payment } from "@/types/billing"
 import { addPayment, deletePayment, getInvoices, getPayments, setInvoicePaidByNumber } from "@/lib/billing-store"
+import { formatCurrency } from "@/lib/currency"
+import { CurrencyCode } from "@/types/invoice"
 
 export default function PaymentsPage() {
   const { user } = useAuth()
+  const { selectedCurrency } = useCurrency()
   const [payments, setPayments] = useState<Payment[]>([])
   const [unpaidInvoices, setUnpaidInvoices] = useState<Invoice[]>([])
 
@@ -127,7 +131,7 @@ export default function PaymentsPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white dark:bg-[#1F1F23] rounded-xl shadow-lg p-6 border border-gray-200 dark:border-[#2B2B30] animate-slide-up">
             <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">Total Payments</p>
-            <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">${totalPayments.toFixed(2)}</p>
+            <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{formatCurrency(totalPayments, selectedCurrency as CurrencyCode)}</p>
           </div>
           <div className="bg-white dark:bg-[#1F1F23] rounded-xl shadow-lg p-6 border border-gray-200 dark:border-[#2B2B30] animate-slide-up">
             <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">Completed</p>
@@ -165,7 +169,7 @@ export default function PaymentsPage() {
                     <option value="">Select an invoice...</option>
                     {unpaidInvoices.map((inv) => (
                       <option key={inv.id} value={inv.invoiceNumber}>
-                        {inv.invoiceNumber} — {inv.clientName} ({inv.currency || 'INR'} {(inv.totalAmount || inv.amount || 0).toFixed(2)})
+                        {inv.invoiceNumber} — {inv.clientName} ({formatCurrency((inv.totalAmount || inv.amount || 0), (inv.currency || selectedCurrency) as CurrencyCode)})
                       </option>
                     ))}
                   </select>
@@ -292,7 +296,7 @@ export default function PaymentsPage() {
                   {payments.map((payment) => (
                     <tr key={payment.id} className="hover:bg-gray-50 dark:hover:bg-[#0F0F12] transition">
                       <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">{payment.invoiceNumber}</td>
-                      <td className="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-white">${payment.amount.toFixed(2)}</td>
+                      <td className="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-white">{formatCurrency(payment.amount, selectedCurrency as CurrencyCode)}</td>
                       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 capitalize">{payment.method.replace('_', ' ')}</td>
                       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{new Date(payment.date).toLocaleDateString()}</td>
                       <td className="px-6 py-4 text-sm">
