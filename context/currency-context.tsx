@@ -97,27 +97,14 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const fetchRatesFromMarket = async (): Promise<Record<CurrencyCode, number> | null> => {
-    try {
-      const response = await fetch('https://open.er-api.com/v6/latest/USD')
-      if (!response.ok) return null
-
-      const data = await response.json()
-      if (data?.result !== 'success' || !data?.rates) return null
-
-      return parseProviderRates(data.rates as Record<string, unknown>)
-    } catch {
-      return null
-    }
-  }
-
   const fetchRatesFromGemini = async (apiKey: string): Promise<Record<CurrencyCode, number> | null> => {
     if (!apiKey) return null
 
     const prompt = [
-      'Return only a JSON object with exchange rates relative to USD base.',
+      'Return only a JSON object with the latest available mid-market exchange rates relative to USD base.',
       'Rules: USD must be 1, and all values must be numbers only (no strings).',
       'Include exactly these keys: USD, INR, EUR, GBP, AUD, CAD, SGD, AED, JPY, CHF.',
+      'Use current real-world rates (today) and do not estimate from old values.',
       'No markdown, no explanation, no extra keys.'
     ].join(' ')
 
@@ -193,13 +180,15 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const syncRates = async () => {
-      // Use market FX feed as primary source and Gemini as fallback.
+      // Sync exchange rates from Gemini only.
+      if (!geminiApiKey) {
+        setExchangeRatesSyncing(false)
+        return
+      }
+
       setExchangeRatesSyncing(true)
 
-      let nextRates = await fetchRatesFromMarket()
-      if (!nextRates && geminiApiKey) {
-        nextRates = await fetchRatesFromGemini(geminiApiKey)
-      }
+      const nextRates = await fetchRatesFromGemini(geminiApiKey)
 
       if (!nextRates) {
         setExchangeRatesSyncing(false)
