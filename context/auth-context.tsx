@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { findUserByCredentials } from '@/lib/billing-store'
 
 interface User {
   id: string
@@ -44,14 +45,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     // First check against demo users
     let validUser: any = VALID_USERS.find(u => u.email === email && u.password === password)
-    
-    // If not found in demo users, check against custom users from billingUsers
+
+    // Then check custom users from Supabase/local storage adapter.
     if (!validUser) {
-      const storedUsers = localStorage.getItem('billingUsers')
-      if (storedUsers) {
-        const customUsers = JSON.parse(storedUsers)
-        validUser = customUsers.find((u: any) => u.email === email && u.password === password)
-      }
+      validUser = await findUserByCredentials(email, password)
     }
     
     if (validUser) {

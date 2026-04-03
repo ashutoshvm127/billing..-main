@@ -8,20 +8,30 @@ import EnhancedInvoiceForm from "@/components/invoices/enhanced-invoice-form"
 import InvoicePreview from "@/components/invoices/invoice-preview-enhanced"
 import { Invoice } from "@/types/invoice"
 import { Button } from "@/components/ui/button"
+import { useAuth } from "@/context/auth-context"
+import { deleteInvoice, getInvoices, upsertInvoice } from "@/lib/billing-store"
 
 export default function InvoicesPage() {
+  const { user } = useAuth()
   const [invoices, setInvoices] = useState<Invoice[]>([])
 
   useEffect(() => {
-    const stored = localStorage.getItem('billingInvoices')
-    setInvoices(stored ? JSON.parse(stored) : [])
-  }, [])
+    const loadInvoices = async () => {
+      if (!user?.id) return
+      const loaded = await getInvoices(user.id)
+      setInvoices(loaded)
+    }
+
+    loadInvoices()
+  }, [user?.id])
   
   const [showForm, setShowForm] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
 
-  const handleAddInvoice = (newInvoice: Invoice) => {
+  const handleAddInvoice = async (newInvoice: Invoice) => {
+    if (!user?.id) return
+
     const existing = invoices.find(inv => inv.id === newInvoice.id)
     let updated
     if (existing) {
@@ -29,15 +39,18 @@ export default function InvoicesPage() {
     } else {
       updated = [...invoices, newInvoice]
     }
+
+    await upsertInvoice(user.id, newInvoice)
     setInvoices(updated)
-    localStorage.setItem('billingInvoices', JSON.stringify(updated))
     setShowForm(false)
   }
 
-  const handleDeleteInvoice = (id: string) => {
+  const handleDeleteInvoice = async (id: string) => {
+    if (!user?.id) return
+
     const updated = invoices.filter(inv => inv.id !== id)
+    await deleteInvoice(user.id, id)
     setInvoices(updated)
-    localStorage.setItem('billingInvoices', JSON.stringify(updated))
   }
 
   const handleSendEmail = async (invoice: Invoice) => {

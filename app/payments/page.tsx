@@ -4,24 +4,30 @@ import { ProtectedLayout } from "@/components/protected-layout"
 import { PageNavigation } from "@/components/page-navigation"
 import { useEffect, useState } from "react"
 import { Plus, Trash2, CheckCircle, AlertCircle } from "lucide-react"
-
-interface Payment {
-  id: string
-  invoiceNumber: string
-  amount: number
-  method: string
-  date: string
-  status: 'completed' | 'pending' | 'failed'
-  notes: string
-}
+import { useAuth } from "@/context/auth-context"
+import { Invoice } from "@/types/invoice"
+import { Payment } from "@/types/billing"
+import { addPayment, deletePayment, getInvoices, getPayments, setInvoicePaidByNumber } from "@/lib/billing-store"
 
 export default function PaymentsPage() {
+  const { user } = useAuth()
   const [payments, setPayments] = useState<Payment[]>([])
+  const [unpaidInvoices, setUnpaidInvoices] = useState<Invoice[]>([])
 
   useEffect(() => {
-    const stored = localStorage.getItem('billingPayments')
-    setPayments(stored ? JSON.parse(stored) : [])
-  }, [])
+    const load = async () => {
+      if (!user?.id) return
+      const [loadedPayments, loadedInvoices] = await Promise.all([
+        getPayments(user.id),
+        getInvoices(user.id)
+      ])
+
+      setPayments(loadedPayments)
+      setUnpaidInvoices(loadedInvoices.filter((inv) => inv.status !== 'paid'))
+    }
+
+    load()
+  }, [user?.id])
 
   const [showForm, setShowForm] = useState(false)
   const [formData, setFormData] = useState({
@@ -33,8 +39,10 @@ export default function PaymentsPage() {
     notes: ''
   })
 
-  const handleAddPayment = (e: React.FormEvent) => {
+  const handleAddPayment = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!user?.id) return
 
     if (!formData.invoiceNumber || !formData.amount) {
       alert('Invoice number and amount are required')
@@ -43,12 +51,21 @@ export default function PaymentsPage() {
 
     const newPayment: Payment = {
       id: Math.random().toString(36).substr(2, 9),
-      ...formData
+      ...formData,
+      createdAt: new Date().toISOString(),
     }
+
+    await addPayment(user.id, newPayment)
 
     const updated = [...payments, newPayment]
     setPayments(updated)
-    localStorage.setItem('billingPayments', JSON.stringify(updated))
+
+    // If payment is completed, mark the matching invoice as 'paid'
+    if (formData.status === 'completed') {
+      await setInvoicePaidByNumber(user.id, formData.invoiceNumber)
+      const refreshedInvoices = await getInvoices(user.id)
+      setUnpaidInvoices(refreshedInvoices.filter((inv) => inv.status !== 'paid'))
+    }
 
     // Reset form
     setFormData({
@@ -62,10 +79,12 @@ export default function PaymentsPage() {
     setShowForm(false)
   }
 
-  const handleDeletePayment = (id: string) => {
+  const handleDeletePayment = async (id: string) => {
+    if (!user?.id) return
+
+    await deletePayment(user.id, id)
     const updated = payments.filter(p => p.id !== id)
     setPayments(updated)
-    localStorage.setItem('billingPayments', JSON.stringify(updated))
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -130,14 +149,29 @@ export default function PaymentsPage() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Invoice Number *
                   </label>
-                  <input
-                    type="text"
+                  <select
                     name="invoiceNumber"
                     value={formData.invoiceNumber}
-                    onChange={handleInputChange}
-                    placeholder="INV-2024-0001"
+                    onChange={(e) => {
+                      const selected = unpaidInvoices.find((inv) => inv.invoiceNumber === e.target.value)
+                      setFormData(prev => ({
+                        ...prev,
+                        invoiceNumber: e.target.value,
+                        amount: selected ? selected.amount || selected.totalAmount || 0 : prev.amount
+                      }))
+                    }}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-[#2B2B30] rounded-lg dark:bg-[#0F0F12] dark:text-white focus:ring-2 focus:ring-blue-500"
-                  />
+                  >
+                    <option value="">Select an invoice...</option>
+                    {unpaidInvoices.map((inv) => (
+                      <option key={inv.id} value={inv.invoiceNumber}>
+                        {inv.invoiceNumber} — {inv.clientName} ({inv.currency || 'INR'} {(inv.totalAmount || inv.amount || 0).toFixed(2)})
+                      </option>
+                    ))}
+                  </select>
+                  {unpaidInvoices.length === 0 && (
+                    <p className="text-xs text-gray-500 mt-1">No unpaid invoices found</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

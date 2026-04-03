@@ -4,6 +4,8 @@ import { Calendar, CreditCard, Wallet, TrendingUp, DollarSign } from "lucide-rea
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useCurrency } from "@/context/currency-context"
+import { useAuth } from "@/context/auth-context"
+import { getInvoices } from "@/lib/billing-store"
 
 interface Invoice {
   id: string
@@ -17,12 +19,14 @@ interface Invoice {
 }
 
 export default function Content() {
+  const { user } = useAuth()
   const { selectedCurrency } = useCurrency()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [stats, setStats] = useState({
     totalRevenue: 0,
     totalInvoices: 0,
-    overdueAmount: 0
+    overdueAmount: 0,
+    unpaidCount: 0
   })
 
   const getCurrencySymbol = (currency: string) => {
@@ -46,21 +50,31 @@ export default function Content() {
   }
 
   useEffect(() => {
-    const stored = localStorage.getItem('billingInvoices')
-    const invoicesList = stored ? JSON.parse(stored) : []
-    setInvoices(invoicesList)
+    const loadDashboardData = async () => {
+      if (!user?.id) return
 
-    const totalRevenue = invoicesList.reduce((sum: number, inv: Invoice) => sum + inv.amount, 0)
-    const overdueAmount = invoicesList
-      .filter((inv: Invoice) => inv.status === 'overdue')
-      .reduce((sum: number, inv: Invoice) => sum + inv.amount, 0)
+      const invoicesList = await getInvoices(user.id)
+      setInvoices(invoicesList)
 
-    setStats({
-      totalRevenue,
-      totalInvoices: invoicesList.length,
-      overdueAmount
-    })
-  }, [])
+      // Revenue = only invoices that have been paid
+      const totalRevenue = invoicesList
+        .filter((inv: Invoice) => inv.status === 'paid')
+        .reduce((sum: number, inv: Invoice) => sum + inv.amount, 0)
+      // Overdue/Unpaid = all invoices that are NOT paid
+      const unpaidInvoices = invoicesList.filter((inv: Invoice) => inv.status !== 'paid')
+      const overdueAmount = unpaidInvoices
+        .reduce((sum: number, inv: Invoice) => sum + inv.amount, 0)
+
+      setStats({
+        totalRevenue,
+        totalInvoices: invoicesList.length,
+        overdueAmount,
+        unpaidCount: unpaidInvoices.length
+      })
+    }
+
+    loadDashboardData()
+  }, [user?.id])
 
   return (
     <div className="space-y-6">
@@ -94,9 +108,9 @@ export default function Content() {
         <div className="bg-white/80 dark:bg-[#1a1a1f]/80 backdrop-blur-sm rounded-xl p-5 border border-gray-200/60 dark:border-[#2B2B30] shadow-sm hover:shadow-md transition-all group">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-gray-500 dark:text-gray-400 text-xs font-medium uppercase tracking-wide">Overdue ({selectedCurrency})</p>
+              <p className="text-gray-500 dark:text-gray-400 text-xs font-medium uppercase tracking-wide">Unpaid ({selectedCurrency})</p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white mt-1">{formatCurrency(stats.overdueAmount)}</p>
-              <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">Needs attention</p>
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">{stats.unpaidCount} invoice{stats.unpaidCount !== 1 ? 's' : ''} pending payment</p>
             </div>
             <div className="p-2.5 bg-amber-100 dark:bg-amber-500/15 rounded-lg group-hover:scale-105 transition-transform">
               <TrendingUp className="w-5 h-5 text-amber-600 dark:text-amber-400" />

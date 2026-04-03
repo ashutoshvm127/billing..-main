@@ -4,6 +4,8 @@ import { ProtectedLayout } from '@/components/protected-layout'
 import { Button } from '@/components/ui/button'
 import { useEffect, useState } from 'react'
 import { Sparkles, TrendingUp, AlertCircle, CheckCircle } from 'lucide-react'
+import { useAuth } from '@/context/auth-context'
+import { getInvoices } from '@/lib/billing-store'
 
 interface Metrics {
   totalRevenue: number
@@ -16,6 +18,7 @@ interface Metrics {
 }
 
 export default function ReportsAIPage() {
+  const { user } = useAuth()
   const [metrics, setMetrics] = useState<Metrics | null>(null)
   const [invoices, setInvoices] = useState<any[]>([])
   const [insights, setInsights] = useState<string>('')
@@ -23,27 +26,32 @@ export default function ReportsAIPage() {
   const [error, setError] = useState<string>('')
 
   useEffect(() => {
-    const stored = localStorage.getItem('billingInvoices')
-    const invoicesList = stored ? JSON.parse(stored) : []
-    setInvoices(invoicesList)
+    const loadData = async () => {
+      if (!user?.id) return
 
-    const totalRevenue = invoicesList.reduce((sum: number, inv: any) => sum + inv.totalAmount, 0)
-    const paidInvoices = invoicesList.filter((inv: any) => inv.status === 'paid').length
-    const pendingInvoices = invoicesList.filter((inv: any) => inv.status === 'sent' || inv.status === 'draft').length
-    const overdueAmount = invoicesList
-      .filter((inv: any) => inv.status === 'overdue')
-      .reduce((sum: number, inv: any) => sum + inv.totalAmount, 0)
+      const invoicesList = await getInvoices(user.id)
+      setInvoices(invoicesList)
 
-    setMetrics({
-      totalRevenue,
-      totalInvoices: invoicesList.length,
-      paidInvoices,
-      pendingInvoices,
-      averageInvoiceValue: invoicesList.length > 0 ? totalRevenue / invoicesList.length : 0,
-      collectionRate: invoicesList.length > 0 ? (paidInvoices / invoicesList.length) * 100 : 0,
-      overdueAmount
-    })
-  }, [])
+      const totalRevenue = invoicesList.reduce((sum: number, inv: any) => sum + inv.totalAmount, 0)
+      const paidInvoices = invoicesList.filter((inv: any) => inv.status === 'paid').length
+      const pendingInvoices = invoicesList.filter((inv: any) => inv.status === 'sent' || inv.status === 'draft' || inv.status === 'overdue').length
+      const overdueAmount = invoicesList
+        .filter((inv: any) => inv.status === 'overdue')
+        .reduce((sum: number, inv: any) => sum + inv.totalAmount, 0)
+
+      setMetrics({
+        totalRevenue,
+        totalInvoices: invoicesList.length,
+        paidInvoices,
+        pendingInvoices,
+        averageInvoiceValue: invoicesList.length > 0 ? totalRevenue / invoicesList.length : 0,
+        collectionRate: invoicesList.length > 0 ? (paidInvoices / invoicesList.length) * 100 : 0,
+        overdueAmount
+      })
+    }
+
+    loadData()
+  }, [user?.id])
 
   const generateInsights = async () => {
     if (!metrics) return

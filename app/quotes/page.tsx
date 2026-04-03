@@ -6,53 +6,39 @@ import { useState, useEffect } from "react"
 import { Plus, Edit2, Trash2, Eye } from "lucide-react"
 import EnhancedInvoiceForm from "@/components/invoices/enhanced-invoice-form"
 import InvoicePreview from "@/components/invoices/invoice-preview-enhanced"
-
-interface Quote {
-  id: string
-  quoteNumber: string
-  clientName: string
-  clientEmail: string
-  amount: number
-  status: 'draft' | 'sent' | 'accepted' | 'rejected'
-  expiryDate: string
-  items: any[]
-  notes: string
-  createdAt: string
-  currency: string
-  companyEmail?: string
-  companyPhone?: string
-  companyAddress?: string
-  upiId?: string
-  taxRate?: number
-  subtotal?: number
-  taxAmount?: number
-  totalAmount?: number
-  companyName?: string
-}
+import { useAuth } from "@/context/auth-context"
+import { Quote } from "@/types/billing"
+import { deleteQuote, getQuotes, upsertQuote } from "@/lib/billing-store"
 
 export default function QuotesPage() {
+  const { user } = useAuth()
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [showForm, setShowForm] = useState(false)
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
 
   useEffect(() => {
-    // Load quotes from localStorage
-    const stored = localStorage.getItem('quotes')
-    if (stored) {
-      setQuotes(JSON.parse(stored))
+    const loadQuotes = async () => {
+      if (!user?.id) return
+      const loaded = await getQuotes(user.id)
+      setQuotes(loaded)
     }
-  }, [])
+
+    loadQuotes()
+  }, [user?.id])
 
   const generateQuoteNumber = () => {
     return `QT-${Date.now().toString().slice(-8)}`
   }
 
-  const handleSaveQuote = (formData: any) => {
+  const handleSaveQuote = async (formData: any) => {
+    if (!user?.id) return
+
     if (editingId) {
-      const updated = quotes.map(q => q.id === editingId ? { ...formData, id: editingId } : q)
+      const editedQuote = { ...formData, id: editingId } as Quote
+      const updated = quotes.map(q => q.id === editingId ? editedQuote : q)
+      await upsertQuote(user.id, editedQuote)
       setQuotes(updated)
-      localStorage.setItem('quotes', JSON.stringify(updated))
       setEditingId(null)
     } else {
       const newQuote: Quote = {
@@ -61,18 +47,20 @@ export default function QuotesPage() {
         quoteNumber: generateQuoteNumber(),
         createdAt: new Date().toISOString(),
       }
+      await upsertQuote(user.id, newQuote)
       const updated = [...quotes, newQuote]
       setQuotes(updated)
-      localStorage.setItem('quotes', JSON.stringify(updated))
     }
     setShowForm(false)
   }
 
-  const handleDeleteQuote = (id: string) => {
+  const handleDeleteQuote = async (id: string) => {
+    if (!user?.id) return
+
     if (confirm('Are you sure you want to delete this quote?')) {
+      await deleteQuote(user.id, id)
       const updated = quotes.filter(q => q.id !== id)
       setQuotes(updated)
-      localStorage.setItem('quotes', JSON.stringify(updated))
     }
   }
 

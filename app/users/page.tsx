@@ -5,15 +5,8 @@ import { PageNavigation } from "@/components/page-navigation"
 import { useAuth } from "@/context/auth-context"
 import { useState, useEffect } from "react"
 import { Plus, Trash2, Shield, User } from "lucide-react"
-
-interface UserAccess {
-  id: string
-  email: string
-  password: string
-  role: 'admin' | 'user'
-  accessLevel: 'full' | 'limited' | 'readonly'
-  createdAt: string
-}
+import { addUser, getUsers, removeUser } from "@/lib/billing-store"
+import { UserAccess } from "@/types/billing"
 
 export default function UsersPage() {
   const { user } = useAuth()
@@ -29,28 +22,34 @@ export default function UsersPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
 
   useEffect(() => {
-    // Load users from localStorage
-    const stored = localStorage.getItem('billingUsers')
-    if (stored) {
-      setUsers(JSON.parse(stored))
-    } else {
-      // Initialize with default admin user
+    const loadUsers = async () => {
+      const loadedUsers = await getUsers()
+      if (loadedUsers.length > 0) {
+        setUsers(loadedUsers)
+        return
+      }
+
+      // Initialize with default admin user.
       const defaultUsers: UserAccess[] = [
         {
           id: 'admin-001',
-          email: 'admin123',
-          password: 'admin123adminfull01/04/2026',
+          email: 'admin123@admin.com',
+          password: 'admin123',
           role: 'admin',
           accessLevel: 'full',
           createdAt: new Date().toISOString(),
+          companyName: 'Cortexio',
         },
       ]
+
+      await addUser(defaultUsers[0])
       setUsers(defaultUsers)
-      localStorage.setItem('billingUsers', JSON.stringify(defaultUsers))
     }
+
+    loadUsers()
   }, [])
 
-  const handleAddUser = () => {
+  const handleAddUser = async () => {
     if (!newUser.email || !newUser.password) {
       setSavedMessage('Please fill in all required fields')
       return
@@ -63,11 +62,12 @@ export default function UsersPage() {
       role: newUser.role,
       accessLevel: newUser.accessLevel,
       createdAt: new Date().toISOString(),
+      companyName: 'Cortexio',
     }
 
+    await addUser(user)
     const updated = [...users, user]
     setUsers(updated)
-    localStorage.setItem('billingUsers', JSON.stringify(updated))
     
     setNewUser({ email: '', password: '', role: 'user', accessLevel: 'limited' })
     setShowAddForm(false)
@@ -75,12 +75,12 @@ export default function UsersPage() {
     setTimeout(() => setSavedMessage(''), 3000)
   }
 
-  const handleRemoveUser = (id: string) => {
+  const handleRemoveUser = async (id: string) => {
     if (user?.role !== 'admin') return
-    
+
+    await removeUser(id)
     const updated = users.filter(u => u.id !== id)
     setUsers(updated)
-    localStorage.setItem('billingUsers', JSON.stringify(updated))
     setSavedMessage('User removed successfully')
     setDeleteConfirm(null)
     setTimeout(() => setSavedMessage(''), 3000)

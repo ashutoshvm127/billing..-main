@@ -5,14 +5,20 @@ import { PageNavigation } from "@/components/page-navigation"
 import { useEffect, useState } from "react"
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { TrendingUp, DollarSign, FileText, Clock, Download } from "lucide-react"
+import { useAuth } from "@/context/auth-context"
+import { getInvoices, saveReportSnapshot } from "@/lib/billing-store"
 
 interface Invoice {
+  id: string
+  invoiceNumber: string
+  clientName: string
   amount: number
   status: string
   createdAt: string
 }
 
 export default function ReportsPage() {
+  const { user } = useAuth()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [stats, setStats] = useState({
     totalRevenue: 0,
@@ -24,49 +30,65 @@ export default function ReportsPage() {
   const [statusData, setStatusData] = useState([])
 
   useEffect(() => {
-    const stored = localStorage.getItem('billingInvoices')
-    const invoicesList = stored ? JSON.parse(stored) : []
-    setInvoices(invoicesList)
+    const loadReportsData = async () => {
+      if (!user?.id) return
 
-    // Calculate stats
-    const totalRevenue = invoicesList.reduce((sum: number, inv: Invoice) => sum + inv.amount, 0)
-    const paidAmount = invoicesList
-      .filter((inv: Invoice) => inv.status === 'paid')
-      .reduce((sum: number, inv: Invoice) => sum + inv.amount, 0)
-    const pendingAmount = totalRevenue - paidAmount
+      const invoicesList = await getInvoices(user.id)
+      setInvoices(invoicesList)
 
-    setStats({
-      totalRevenue,
-      totalInvoices: invoicesList.length,
-      paidAmount,
-      pendingAmount
-    })
+      // Calculate stats
+      const totalRevenue = invoicesList.reduce((sum: number, inv: Invoice) => sum + inv.amount, 0)
+      const paidAmount = invoicesList
+        .filter((inv: Invoice) => inv.status === 'paid')
+        .reduce((sum: number, inv: Invoice) => sum + inv.amount, 0)
+      const pendingAmount = totalRevenue - paidAmount
 
-    // Prepare chart data - monthly revenue
-    const monthlyData: { [key: string]: number } = {}
-    invoicesList.forEach((inv: Invoice) => {
-      const month = new Date(inv.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
-      monthlyData[month] = (monthlyData[month] || 0) + inv.amount
-    })
+      setStats({
+        totalRevenue,
+        totalInvoices: invoicesList.length,
+        paidAmount,
+        pendingAmount
+      })
 
-    const chartDataArray = Object.entries(monthlyData).map(([month, amount]) => ({
-      month,
-      revenue: amount
-    }))
-    setChartData(chartDataArray)
+      // Prepare chart data - monthly revenue
+      const monthlyData: { [key: string]: number } = {}
+      invoicesList.forEach((inv: Invoice) => {
+        const month = new Date(inv.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
+        monthlyData[month] = (monthlyData[month] || 0) + inv.amount
+      })
 
-    // Status breakdown
-    const statusBreakdown: { [key: string]: number } = {}
-    invoicesList.forEach((inv: Invoice) => {
-      statusBreakdown[inv.status] = (statusBreakdown[inv.status] || 0) + 1
-    })
+      const chartDataArray = Object.entries(monthlyData).map(([month, amount]) => ({
+        month,
+        revenue: amount
+      }))
+      setChartData(chartDataArray)
 
-    const statusDataArray = Object.entries(statusBreakdown).map(([status, count]) => ({
-      name: status.charAt(0).toUpperCase() + status.slice(1),
-      value: count
-    }))
-    setStatusData(statusDataArray)
-  }, [])
+      // Status breakdown
+      const statusBreakdown: { [key: string]: number } = {}
+      invoicesList.forEach((inv: Invoice) => {
+        statusBreakdown[inv.status] = (statusBreakdown[inv.status] || 0) + 1
+      })
+
+      const statusDataArray = Object.entries(statusBreakdown).map(([status, count]) => ({
+        name: status.charAt(0).toUpperCase() + status.slice(1),
+        value: count
+      }))
+      setStatusData(statusDataArray)
+
+      await saveReportSnapshot({
+        id: `report-${user.id}`,
+        userId: user.id,
+        totalRevenue,
+        totalInvoices: invoicesList.length,
+        paidAmount,
+        pendingAmount,
+        amountCollected: paidAmount,
+        createdAt: new Date().toISOString(),
+      })
+    }
+
+    loadReportsData()
+  }, [user?.id])
 
   const colors = ['#3B82F6', '#10B981', '#EF4444', '#F59E0B']
 
