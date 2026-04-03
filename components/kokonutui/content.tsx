@@ -1,7 +1,7 @@
 'use client'
 
 import { Calendar, CreditCard, Wallet, TrendingUp, DollarSign } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { useCurrency } from "@/context/currency-context"
 import { useAuth } from "@/context/auth-context"
@@ -41,32 +41,50 @@ export default function Content() {
   const formatInSelectedCurrency = (amount: number) =>
     formatCurrency(amount, selectedCurrencyCode)
 
+  const loadDashboardData = useCallback(async () => {
+    if (!user?.id) return
+
+    const invoicesList = await getInvoices(user.id)
+    setInvoices(invoicesList)
+
+    // Revenue = only invoices that have been paid
+    const totalRevenue = invoicesList
+      .filter((inv: Invoice) => inv.status === 'paid')
+      .reduce((sum: number, inv: Invoice) => sum + toSelectedCurrency(inv.amount, inv.currency), 0)
+    // Overdue/Unpaid = all invoices that are NOT paid
+    const unpaidInvoices = invoicesList.filter((inv: Invoice) => inv.status !== 'paid')
+    const overdueAmount = unpaidInvoices
+      .reduce((sum: number, inv: Invoice) => sum + toSelectedCurrency(inv.amount, inv.currency), 0)
+
+    setStats({
+      totalRevenue,
+      totalInvoices: invoicesList.length,
+      overdueAmount,
+      unpaidCount: unpaidInvoices.length
+    })
+  }, [user?.id, selectedCurrencyCode, exchangeRates])
+
   useEffect(() => {
-    const loadDashboardData = async () => {
-      if (!user?.id) return
+    loadDashboardData()
+  }, [loadDashboardData])
 
-      const invoicesList = await getInvoices(user.id)
-      setInvoices(invoicesList)
-
-      // Revenue = only invoices that have been paid
-      const totalRevenue = invoicesList
-        .filter((inv: Invoice) => inv.status === 'paid')
-        .reduce((sum: number, inv: Invoice) => sum + toSelectedCurrency(inv.amount, inv.currency), 0)
-      // Overdue/Unpaid = all invoices that are NOT paid
-      const unpaidInvoices = invoicesList.filter((inv: Invoice) => inv.status !== 'paid')
-      const overdueAmount = unpaidInvoices
-        .reduce((sum: number, inv: Invoice) => sum + toSelectedCurrency(inv.amount, inv.currency), 0)
-
-      setStats({
-        totalRevenue,
-        totalInvoices: invoicesList.length,
-        overdueAmount,
-        unpaidCount: unpaidInvoices.length
-      })
+  useEffect(() => {
+    const onBillingDataChanged = () => {
+      loadDashboardData()
     }
 
-    loadDashboardData()
-  }, [user?.id, selectedCurrency, exchangeRates])
+    const onWindowFocus = () => {
+      loadDashboardData()
+    }
+
+    window.addEventListener('billing:data-changed', onBillingDataChanged as EventListener)
+    window.addEventListener('focus', onWindowFocus)
+
+    return () => {
+      window.removeEventListener('billing:data-changed', onBillingDataChanged as EventListener)
+      window.removeEventListener('focus', onWindowFocus)
+    }
+  }, [loadDashboardData])
 
   return (
     <div className="space-y-6">

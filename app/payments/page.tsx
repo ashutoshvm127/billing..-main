@@ -8,7 +8,7 @@ import { useAuth } from "@/context/auth-context"
 import { useCurrency } from "@/context/currency-context"
 import { Invoice } from "@/types/invoice"
 import { Payment } from "@/types/billing"
-import { addPayment, deletePayment, getInvoices, getPayments, setInvoicePaidByNumber } from "@/lib/billing-store"
+import { addPayment, deletePayment, getInvoices, getPayments, setInvoicePaidByNumber, setInvoiceStatusByNumber, upsertPayment } from "@/lib/billing-store"
 import { formatCurrency } from "@/lib/currency"
 import { CurrencyCode } from "@/types/invoice"
 
@@ -17,6 +17,12 @@ export default function PaymentsPage() {
   const { selectedCurrency } = useCurrency()
   const [payments, setPayments] = useState<Payment[]>([])
   const [unpaidInvoices, setUnpaidInvoices] = useState<Invoice[]>([])
+  const [undoPaymentAction, setUndoPaymentAction] = useState<{
+    invoiceNumber: string
+    previousStatus: Invoice['status']
+    paymentId: string
+  } | null>(null)
+  const [undoMessage, setUndoMessage] = useState<string | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -66,9 +72,24 @@ export default function PaymentsPage() {
 
     // If payment is completed, mark the matching invoice as 'paid'
     if (formData.status === 'completed') {
+      const previousInvoice = unpaidInvoices.find((inv) => inv.invoiceNumber === formData.invoiceNumber)
+
       await setInvoicePaidByNumber(user.id, formData.invoiceNumber)
       const refreshedInvoices = await getInvoices(user.id)
       setUnpaidInvoices(refreshedInvoices.filter((inv) => inv.status !== 'paid'))
+
+      if (previousInvoice) {
+        // Allow a single undo for accidental paid markings.
+        setUndoPaymentAction({
+          invoiceNumber: formData.invoiceNumber,
+          previousStatus: previousInvoice.status,
+          paymentId: newPayment.id,
+        })
+        setUndoMessage(null)
+      }
+    } else {
+      setUndoPaymentAction(null)
+      setUndoMessage(null)
     }
 
     // Reset form
@@ -81,6 +102,29 @@ export default function PaymentsPage() {
       notes: ''
     })
     setShowForm(false)
+  }
+
+  const handleUndoMarkPaid = async () => {
+    if (!user?.id || !undoPaymentAction) return
+
+    const targetPayment = payments.find((payment) => payment.id === undoPaymentAction.paymentId)
+    await setInvoiceStatusByNumber(user.id, undoPaymentAction.invoiceNumber, undoPaymentAction.previousStatus)
+
+    if (targetPayment) {
+      const updatedPayment: Payment = {
+        ...targetPayment,
+        status: 'pending',
+      }
+      await upsertPayment(user.id, updatedPayment)
+      setPayments((prev) => prev.map((payment) => (
+        payment.id === updatedPayment.id ? updatedPayment : payment
+      )))
+    }
+
+    const refreshedInvoices = await getInvoices(user.id)
+    setUnpaidInvoices(refreshedInvoices.filter((inv) => inv.status !== 'paid'))
+    setUndoPaymentAction(null)
+    setUndoMessage(`Undone: ${undoPaymentAction.invoiceNumber} restored to ${undoPaymentAction.previousStatus} and payment marked pending.`)
   }
 
   const handleDeletePayment = async (id: string) => {
@@ -126,6 +170,26 @@ export default function PaymentsPage() {
             Record Payment
           </button>
         </div>
+
+        {undoPaymentAction && (
+          <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <p className="text-sm text-amber-900 dark:text-amber-200">
+              Payment was marked completed for <span className="font-semibold">{undoPaymentAction.invoiceNumber}</span>. If this was accidental, you can undo it once.
+            </p>
+            <button
+              onClick={handleUndoMarkPaid}
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg transition"
+            >
+              Undo Once
+            </button>
+          </div>
+        )}
+
+        {undoMessage && (
+          <div className="bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/30 rounded-xl p-3">
+            <p className="text-sm text-green-800 dark:text-green-300">{undoMessage}</p>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

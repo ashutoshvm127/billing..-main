@@ -85,6 +85,11 @@ function writeLocal<T>(key: string, value: T[]): void {
   localStorage.setItem(key, JSON.stringify(value))
 }
 
+function emitBillingDataChanged(): void {
+  if (!isBrowser()) return
+  window.dispatchEvent(new CustomEvent('billing:data-changed'))
+}
+
 function getMigrationKey(scope: string) {
   return `billingMigrated:${scope}:${MIGRATION_VERSION}`
 }
@@ -227,6 +232,8 @@ export async function upsertInvoice(userId: string, invoice: Invoice): Promise<v
     },
     { onConflict: 'id' }
   )
+
+  emitBillingDataChanged()
 }
 
 export async function deleteInvoice(userId: string, id: string): Promise<void> {
@@ -236,6 +243,8 @@ export async function deleteInvoice(userId: string, id: string): Promise<void> {
 
   if (!supabase) return
   await supabase.from('invoices').delete().eq('id', id).eq('user_id', userId)
+
+  emitBillingDataChanged()
 }
 
 export async function setInvoicePaidByNumber(userId: string, invoiceNumber: string): Promise<void> {
@@ -246,6 +255,21 @@ export async function setInvoicePaidByNumber(userId: string, invoiceNumber: stri
   await upsertInvoice(userId, {
     ...target,
     status: 'paid',
+  })
+}
+
+export async function setInvoiceStatusByNumber(
+  userId: string,
+  invoiceNumber: string,
+  status: Invoice['status']
+): Promise<void> {
+  const invoices = await getInvoices(userId)
+  const target = invoices.find((inv) => inv.invoiceNumber === invoiceNumber)
+  if (!target) return
+
+  await upsertInvoice(userId, {
+    ...target,
+    status,
   })
 }
 
@@ -282,6 +306,31 @@ export async function addPayment(userId: string, payment: Payment): Promise<void
     created_at: payment.createdAt || new Date().toISOString(),
     data: payment,
   })
+
+  emitBillingDataChanged()
+}
+
+export async function upsertPayment(userId: string, payment: Payment): Promise<void> {
+  const supabase = getSupabaseClient()
+  const local = readLocal<Payment>(STORAGE_KEYS.payments)
+  const exists = local.find((pay) => pay.id === payment.id)
+  const nextLocal = exists
+    ? local.map((pay) => (pay.id === payment.id ? payment : pay))
+    : [...local, payment]
+  writeLocal(STORAGE_KEYS.payments, nextLocal)
+
+  if (!supabase) return
+  await supabase.from('payments').upsert(
+    {
+      id: payment.id,
+      user_id: userId,
+      created_at: payment.createdAt || payment.date || new Date().toISOString(),
+      data: payment,
+    },
+    { onConflict: 'id' }
+  )
+
+  emitBillingDataChanged()
 }
 
 export async function deletePayment(userId: string, id: string): Promise<void> {
@@ -291,6 +340,8 @@ export async function deletePayment(userId: string, id: string): Promise<void> {
 
   if (!supabase) return
   await supabase.from('payments').delete().eq('id', id).eq('user_id', userId)
+
+  emitBillingDataChanged()
 }
 
 export async function getQuotes(userId: string): Promise<Quote[]> {
