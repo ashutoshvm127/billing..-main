@@ -402,7 +402,7 @@ export default function EnhancedInvoiceForm({ onSave, initialData, isQuote = fal
                 className="w-4 h-4 rounded"
               />
               <label htmlFor="sendEmail" className="text-sm text-gray-700 dark:text-gray-300">
-                Send invoice to client via email
+                Send {isQuote ? 'quote' : 'invoice'} to client via email
               </label>
             </div>
           </div>
@@ -422,7 +422,7 @@ export default function EnhancedInvoiceForm({ onSave, initialData, isQuote = fal
               type="submit"
               className="flex-1 bg-green-600 hover:bg-green-700"
             >
-              Save Invoice
+              {isQuote ? 'Save Quote' : 'Save Invoice'}
             </Button>
           </div>
         </form>

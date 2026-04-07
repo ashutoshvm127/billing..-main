@@ -24,9 +24,12 @@ export default function InvoicePreview({ invoice }: { invoice: Invoice }) {
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null)
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false)
 
+  const isQuote = (invoice.invoiceNumber || '').startsWith('QT-')
+  const docLabel = isQuote ? 'Quotation' : 'Invoice'
+
   useEffect(() => {
     if (invoice.upiId) {
-      const upiString = `upi://pay?pa=${invoice.upiId}&pn=${encodeURIComponent(invoice.companyName || 'Invoice')}&am=${invoice.totalAmount}&tn=${encodeURIComponent(`Invoice ${invoice.invoiceNumber}`)}`
+      const upiString = `upi://pay?pa=${invoice.upiId}&pn=${encodeURIComponent(invoice.companyName || docLabel)}&am=${invoice.totalAmount}&tn=${encodeURIComponent(`${docLabel} ${invoice.invoiceNumber}`)}`
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(upiString)}`
       setQrCodeUrl(qrUrl)
     }
@@ -73,13 +76,13 @@ export default function InvoicePreview({ invoice }: { invoice: Invoice }) {
       })
 
       if (response.ok) {
-        alert('Invoice sent successfully!')
+        alert(`${docLabel} sent successfully!`)
       } else {
-        alert('Failed to send invoice')
+        alert(`Failed to send ${docLabel.toLowerCase()}`)
       }
     } catch (error) {
-      console.error('Error sending invoice:', error)
-      alert('Error sending invoice')
+      console.error(`Error sending ${docLabel.toLowerCase()}:`, error)
+      alert(`Error sending ${docLabel.toLowerCase()}`)
     }
   }
 
@@ -151,7 +154,7 @@ export default function InvoicePreview({ invoice }: { invoice: Invoice }) {
               {/* Right Section - Invoice Type and Number */}
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '8px', fontWeight: '600' }}>
-                  Invoice
+                  {docLabel}
                 </div>
                 <div style={{ fontSize: '28px', fontWeight: '700', color: '#1e3a5f', marginBottom: '2px', letterSpacing: '-0.5px' }}>
                   {invoice.invoiceNumber}
@@ -196,7 +199,7 @@ export default function InvoicePreview({ invoice }: { invoice: Invoice }) {
               <table style={{ fontSize: '11px', marginLeft: 'auto' }}>
                 <tbody>
                   <tr>
-                    <td style={{ color: '#666', padding: '3px 12px 3px 0', textAlign: 'left' }}>Invoice Date:</td>
+                    <td style={{ color: '#666', padding: '3px 12px 3px 0', textAlign: 'left' }}>{isQuote ? 'Quote' : 'Invoice'} Date:</td>
                     <td style={{ fontWeight: '500', color: '#111' }}>
                       {new Date(invoice.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </td>
